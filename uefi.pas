@@ -4,38 +4,76 @@ interface
 
 {$POINTERMATH ON}
 type efi_lba=qword;
+     fat32_header=packed record
+                  JumpOrder:array[1..3] of byte;
+                  OemCode:array[1..8] of char;
+                  BytesPerSector:word;
+                  SectorPerCluster:byte;
+                  ReservedSectorCount:word;
+                  NumFATs:byte;
+                  RootEntryCount:word;
+                  TotalSector16:word;
+                  Media:byte;
+                  FATSectors16:word;
+                  SectorPerTrack:word;
+                  NumHeads:word;
+                  HiddenSectors:dword;
+                  TotalSectors32:dword;
+                  FATSector32:dword;
+                  ExtendedFlags:word;
+                  FileSystemVersion:word;
+                  RootCluster:dword;
+                  FileSystemInfo:word;
+                  BootSector:word;
+                  Reserved:array[1..12] of byte;
+                  DriverNumber:byte;
+                  Reserved1:byte;
+                  BootSignature:byte;
+                  VolumeID:dword;
+                  VolumeLabel:array[1..11] of char;
+                  FileSystemType:array[1..8] of char;
+                  Reserved2:array[1..420] of byte;
+                  SignatureWord:word;
+                  Reserved3:array[1..65023] of byte;
+                  end;
+     fat32_file_system_info=packed record
+                            FSI_leadSig:dword;
+                            FSI_Reserved1:array[1..480] of byte;
+                            FSI_StrucSig:dword;
+                            FSI_FreeCount:dword;
+                            FSI_NextFree:dword;
+                            FSI_Reserved2:array[1..12] of byte;
+                            FSI_TrailSig:dword;
+                            FSI_Reserved3:array[1..65023] of byte;
+                            end;
      mbr_partition_record=packed record
                           BootIndicator:byte;
-                          StartHead:byte;
-                          StartSector:byte;
-                          StartTrack:byte;
-                          OSIndicator:byte;
-                          EndHead:byte;
-                          EndSector:byte;
-                          EndTrack:byte;
+                          StartingCHS:array[1..3] of byte;
+                          OSType:byte;
+                          EndingCHS:array[1..3] of byte;
                           StartingLBA:dword;
                           SizeinLBA:dword;
                           end;
      master_boot_record=packed record
                         BootStrapCode:array[1..440] of byte;
-                        UniqueMbrSignature:array[1..4] of byte;
-                        Unknown:array[1..2] of byte;
+                        UniqueMbrSignature:dword;
+                        Unknown:word;
                         Partition:array[1..4] of mbr_partition_record;
                         Signature:word;
                         end;
-     efi_guid=record
+     efi_guid=packed record
               data1:dword;
               data2:word;
               data3:word;
               data4:array[1..8] of byte;
-              end;
+              end; 
      efi_gpt_header=packed record
                     signature:qword;
                     Revision:dword;
                     HeaderSize:dword;
                     HeaderCRC32:dword;
-                    Reserved:dword;
-                    MyLBA:dword;
+                    Reserved1:dword;
+                    MyLBA:qword;
                     AlternateLBA:qword;
                     FirstUsableLBA:qword;
                     LastUsableLBA:qword;
@@ -44,6 +82,7 @@ type efi_lba=qword;
                     NumberOfPartitionEntries:dword;
                     SizeOfPartitionEntry:dword;
                     PartitionEntryArrayCRC32:dword;
+                    Reserved2:array[1..65444] of byte;
                     end;
      efi_partition_entry=packed record
                          PartitionTypeGUID:efi_guid;
@@ -246,7 +285,7 @@ type efi_lba=qword;
      efi_create_event_ex=function (efitype:dword;NotifyTpl:efi_tpl;NotifyFunction:efi_event_notify;const NotifyContext:Pointer;const EventGroup:Pefi_guid;var Event:efi_event):efi_status;cdecl;
      efi_timer_delay=(TimerCancel,TimerPeriodic,TimerRelative);
      efi_set_timer=function (event:efi_event;efitype:efi_timer_delay;TriggerTime:qword):efi_status;cdecl;
-     efi_wait_for_event=function (NumberOfEvents:NatUint;Event:efi_event;Index:PNatUint):efi_status;cdecl;
+     efi_wait_for_event=function (NumberOfEvents:NatUint;Event:efi_event;var Index:NatUint):efi_status;cdecl;
      efi_signal_event=function (event:efi_event):efi_status;cdecl;
      efi_close_event=function (event:efi_event):efi_status;cdecl;
      efi_check_event=function (event:efi_event):efi_status;cdecl;
@@ -292,7 +331,7 @@ type efi_lba=qword;
      efi_locate_protocol=function (Protocol:Pefi_guid;Registation:pointer;var efiinterface:Pointer):efi_status;cdecl;
      efi_install_multiple_protocol_interfaces=function (var Handle:efi_handle;argument:array of Pointer):efi_status;cdecl;
      efi_uninstall_multiple_protocol_interfaces=function (var Handle:efi_handle;argument:array of Pointer):efi_status;cdecl;
-     efi_calculate_crc32=function (Data:Pointer;DataSize:NatUint;var Crc32:Pdword):efi_status;cdecl;
+     efi_calculate_crc32=function (Data:Pointer;DataSize:NatUint;var Crc32:dword):efi_status;cdecl;
      efi_copy_mem=procedure (Destination,Source:Pointer;efilength:NatUint);cdecl;
      efi_set_mem=procedure (Buffer:Pointer;size:NatUint;efivalue:byte);cdecl;
      efi_boot_services=record
@@ -698,7 +737,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                    LastAccessTime:efi_time;
                    ModificationTime:efi_time;
                    Attributes:qword;
-                   FileName:array[1..4096] of WideChar;
+                   FileName:array[1..1024] of WideChar;
                    end;
      Pefi_file_info=^efi_file_info;
      efi_file_system_info=record
@@ -707,11 +746,11 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                           VolumeSize:qword;
                           FreeSpace:qword;
                           BlockSize:dword;
-                          VolumeLabel:array[1..4096] of WideChar;
+                          VolumeLabel:array[1..1024] of WideChar;
                           end;
      Pefi_file_system_info=^efi_file_system_info;
      efi_file_system_volume_label=record
-                                  VolumeLabel:array[1..4096] of WideChar;
+                                  VolumeLabel:array[1..1024] of WideChar;
                                   end;
      Pefi_tape_io_protocol=^efi_tape_io_protocol;
      efi_tape_read=function (This:Pefi_tape_io_protocol;var BufferSize:natuint;var Buffer):efi_status;cdecl;
@@ -1049,33 +1088,27 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                          file_system_content:^Pefi_simple_file_system_protocol;
                          file_system_count:natuint;
                          end;
-    efi_disk_interface_list=record
-                       disk_interface:^Pefi_disk_io_protocol;
-                       disk_count:qword;
-                       end;
-    efi_block_interface_list=record
-                       block_interface:^Pefi_block_io_protocol;
-                       block_count:qword;
-                       end;
-    efi_gpt_entry_array=record
-                        entry_content:^efi_partition_entry;
-                        entry_count:word;
-                        end;
-    efi_gpt_partition_array_content=record
-                                    startlba,endlba:qword;
-                                    end;
-    efi_gpt_partition_array=record
-                            array_content:^efi_gpt_partition_array_content;
-                            array_count:qword;
-                            end;
-    efi_cdrom_data=record
-                   data:Pointer;
-                   size:natuint;
-                   end;
+    efi_file_system_list_ext=record
+                         fsrcontent:^Pefi_simple_file_system_protocol;
+                         fsrcount:natuint;
+                         fsrwcontent:^Pefi_simple_file_system_protocol;
+                         fsrwcount:natuint;
+                         end;
+    efi_disk_list=record
+                  disk_content:^Pefi_disk_io_protocol;
+                  disk_block_content:^Pefi_block_io_protocol;
+                  disk_count:natuint;
+                  end;
+    efi_partition_entry_list=record
+                             epe_content:array[1..128] of efi_partition_entry;
+                             epe_count:natuint;
+                             end;
 {User Defined End}
 const unused_entry_guid:efi_guid=(data1:$00000000;data2:$0000;data3:$0000;data4:($00,$00,$00,$00,$00,$00,$00,$00));
       efi_system_partition_guid:efi_guid=(data1:$C12A7328;data2:$F81F;data3:$11D2;data4:($BA,$4B,$00,$A0,$C9,$3E,$C9,$3B));
-      partition_system_guid:efi_guid=(data1:$CB2A7FF8;data2:$F81D;data3:$11F2;data4:($BA,$46,$00,$A0,$C5,$3E,$C9,$35));
+      tydq_disk_guid:efi_guid=(data1:$D12E73D8;data2:$A81E;data3:$1DF2;data4:($BA,$4F,$FF,$AE,$C9,$3E,$C3,$3B));
+      tydq_efi_system_partition_guid:efi_guid=(data1:$C12A732F;data2:$F81B;data3:$11D2;data4:($BA,$4B,$00,$A0,$C9,$3E,$C9,$3B));
+      tydq_system_guid:efi_guid=(data1:$C12A732E;data2:$F81A;data3:$11D2;data4:($BA,$4B,$00,$A0,$C9,$3E,$C9,$3B));
       partition_containing_a_legacy_mbr_guid:efi_guid=(data1:$024DEE41;data2:$33E7;data3:$11D3;data4:($9D,$69,$00,$08,$C7,$81,$F3,$9F));
       evt_timer:dword=$80000000;
       evt_runtime:dword=$40000000;
@@ -1239,14 +1272,14 @@ const unused_entry_guid:efi_guid=(data1:$00000000;data2:$0000;data3:$0000;data4:
       efi_file_protocol_latest_revision=efi_file_protocol2_revision;
       efi_file_mode_read=$0000000000000001;
       efi_file_mode_write=$0000000000000002;
-      efi_file_mode_create=$0000000000000000;
+      efi_file_mode_create=$8000000000000000;
       efi_file_read_only=$0000000000000001;
       efi_file_hidden=$0000000000000002;
       efi_file_system=$0000000000000004;
       efi_file_reserved=$0000000000000008;
       efi_file_directory=$0000000000000010;
       efi_file_archive=$0000000000000020;
-      efi_file_vaild_addr=$0000000000000037;
+      efi_file_valid_attr=$0000000000000037;
       efi_disk_io_protocol_revision=$00010000;
       efi_disk_io2_protocol_revision=$00020000;
       efi_block_io_protocol_revision2:dword=$00020001;
@@ -1306,16 +1339,11 @@ procedure efi_console_output_string_with_colour(SystemTable:Pefi_system_table;Ou
 procedure efi_console_read_string_with_colour(SystemTable:Pefi_system_table;var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);cdecl;
 function efi_console_timer_mouse_blink(Event:efi_event;Context:Pointer):efi_status;cdecl;
 procedure efi_console_enable_mouse_blink(SystemTable:Pefi_system_table;enableblink:boolean;blinkmilliseconds:qword);cdecl;
-function efi_detect_disk(SystemTable:Pefi_system_table):efi_disk_interface_list;cdecl;
-function efi_detect_block(SystemTable:Pefi_system_table):efi_block_interface_list;cdecl;
-function efi_get_disk_size(Disklist:efi_block_interface_list;number:natuint):natuint;cdecl;
-function efi_read_disk_format_mbr(DiskList:efi_disk_interface_list;Blocklist:efi_block_interface_list;number:natuint):master_boot_record;cdecl;
-function efi_read_disk_format_gpt(DiskList:efi_disk_interface_list;Blocklist:efi_block_interface_list;number:natuint):efi_gpt_header;cdecl;
-function efi_read_disk_gpt_entry_array(DiskList:efi_disk_interface_list;BlockList:efi_block_interface_list;number:natuint):efi_gpt_entry_array;cdecl;
-procedure efi_clear_disk(DiskList:efi_disk_interface_list;BlockList:efi_block_interface_list;number:natuint);cdecl;
-procedure efi_zone_disk(DiskList:efi_disk_interface_list;BlockList:efi_block_interface_list;number:natuint;partarray:efi_gpt_partition_array);cdecl;
-procedure efi_install_cdrom_to_disk(SystemTable:Pefi_system_table;cdromnumber,disknumber:natuint);cdecl;
 function efi_list_all_file_system(SystemTable:Pefi_system_table):efi_file_system_list;cdecl;
+function efi_list_all_file_system_ext(SystemTable:Pefi_system_table):efi_file_system_list_ext;cdecl;
+function efi_detect_disk_write_ability(SystemTable:Pefi_system_table):efi_disk_list;cdecl;
+procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;filesystemlist:efi_file_system_list;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);cdecl;
+procedure efi_install_cdrom_to_hard_disk_stage2(systemtable:Pefi_system_table;efslext:efi_file_system_list_ext;inscd,insdisk:natuint);cdecl;
 
 var maxcolumn:Natuint=80;
     maxrow:Natuint=25;
@@ -1325,7 +1353,12 @@ var maxcolumn:Natuint=80;
     consoletex:byte=efi_lightgrey;
     Cursorblinkevent:efi_event=nil;
     CursorblinkVisible:boolean=false;
-    content:array[1..16777216] of byte;
+    content:array[1..268435456] of byte;
+    mbr,rmbr:master_boot_record;
+    gpt,rgpt1,rgpt2:efi_gpt_header;
+    epe:efi_partition_entry_list;
+    fat32h:fat32_header;
+    fat32fs:fat32_file_system_info;
 
 implementation
 
@@ -1339,7 +1372,8 @@ begin
  currentcolumn:=0; currentrow:=0;
 end;
 procedure efi_console_output_string(SystemTable:Pefi_system_table;outputstring:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_OUTPUT_STRING'];
-var i,len:Natuint;
+var mychar:array[1..2] of WideChar;
+    i,len:Natuint;
 begin
  SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,consolebck shl 4+consoletex);
  i:=1; len:=wstrlen(outputstring)-1;
@@ -1349,28 +1383,43 @@ begin
     begin
      if((outputstring+i-1)^=#13) and ((outputstring+i)^=#10) then 
       begin
+       mychar[1]:=(outputstring+i-1)^;
+       mychar[2]:=#0;
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
+       mychar[1]:=(outputstring+i)^;
+       mychar[2]:=#0;
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
        inc(currentrow); currentcolumn:=0; inc(i,2);
       end
      else
       begin
+       mychar[1]:=(outputstring+i-1)^;
+       mychar[2]:=#0;
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
        inc(currentcolumn); inc(i,1);
       end;
     end
    else
     begin
+     mychar[1]:=(outputstring+i-1)^;
+     mychar[2]:=#0;
+     SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
      inc(currentcolumn); inc(i,1);
     end;
    if(currentcolumn>=maxcolumn) then 
     begin
      currentcolumn:=0; inc(currentrow,1);
     end;
-   if(currentrow>=maxrow) then efi_console_clear_screen(SystemTable);
+   if(currentrow>=maxrow) then 
+    begin
+     efi_console_clear_screen(SystemTable);
+    end;
   end;
- SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,outputstring);
  efi_console_set_cursor_position(SystemTable,currentcolumn,currentrow);
 end;
 procedure efi_console_output_string_with_colour(SystemTable:Pefi_system_table;Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);cdecl;[public,alias:'EFI_CONSOLE_OUTPUT_STRING_WITH_COLOUR'];
-var i,len:Natuint;
+var mychar:array[1..2] of WideChar;
+    i,len:Natuint;
 begin
  SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,backgroundcolour shl 4+textcolour);
  i:=1; len:=wstrlen(outputstring)-1;
@@ -1380,24 +1429,38 @@ begin
     begin
      if((outputstring+i-1)^=#13) and ((outputstring+i)^=#10) then 
       begin
+       mychar[1]:=(outputstring+i-1)^;
+       mychar[2]:=#0;
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
+       mychar[1]:=(outputstring+i)^;
+       mychar[2]:=#0;
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
        inc(currentrow); currentcolumn:=0; inc(i,2);
       end
      else
       begin
+       mychar[1]:=(outputstring+i-1)^;
+       mychar[2]:=#0;
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
        inc(currentcolumn); inc(i,1);
       end;
     end
    else
     begin
+     mychar[1]:=(outputstring+i-1)^;
+     mychar[2]:=#0;
+     SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
      inc(currentcolumn); inc(i,1);
     end;
    if(currentcolumn>=maxcolumn) then 
     begin
      currentcolumn:=0; inc(currentrow,1);
     end;
-   if(currentrow>=maxrow) then efi_console_clear_screen(SystemTable);
+   if(currentrow>=maxrow) then 
+    begin
+     efi_console_clear_screen(SystemTable);
+    end;
   end;
- SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,outputstring);
  efi_console_set_cursor_position(SystemTable,currentcolumn,currentrow);
 end;
 procedure efi_set_watchdog_timer_to_null(SystemTable:Pefi_system_table);cdecl;[public,alias:'EFI_SET_WATCHDOG_TIMER_TO_NULL'];
@@ -1409,17 +1472,17 @@ var key:efi_input_key;
     waitidx,i,j:natuint;
 begin
  SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,consolebck shl 4+consoletex);
- Readstring:=getmem(sizeof(WideChar)*1024); i:=0;
+ Readstring:=getmem(sizeof(WideChar)*1025); i:=0;
  while (True) do
   begin
    inc(i);
    if(i>1024) then break;
-   SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,@waitidx);
-   SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,&key);
+   SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
+   SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
    (ReadString+i-1)^:=key.UnicodeChar;
    if((ReadString+i-1)^=#10) or ((ReadString+i-1)^=#13) then
     begin
-     (ReadString+i-1)^:=#0; inc(i,2);
+     (ReadString+i-1)^:=#0; 
      SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
      currentcolumn:=0; inc(currentrow);
      if(currentrow>=maxrow) then efi_console_clear_screen(SystemTable);
@@ -1460,17 +1523,17 @@ var key:efi_input_key;
     waitidx,i,j:natuint;
 begin
  SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,backgroundcolour shl 4+textcolour);
- Readstring:=getmem(sizeof(WideChar)*1024); i:=0;
+ Readstring:=getmem(sizeof(WideChar)*1025); i:=0;
  while (True) do
   begin
    inc(i);
    if(i>1024) then break;
-   SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,@waitidx);
-   SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,&key);
+   SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
+   SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
    (ReadString+i-1)^:=key.UnicodeChar;
    if((ReadString+i-1)^=#10) or ((ReadString+i-1)^=#13) then
     begin
-     (ReadString+i-1)^:=#0; inc(i,2);
+     (ReadString+i-1)^:=#0; 
      SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
      currentcolumn:=0; inc(currentrow);
      if(currentrow>=maxrow) then efi_console_clear_screen(SystemTable);
@@ -1585,230 +1648,6 @@ begin
    Cursorblinkevent:=nil;
   end;
 end;
-function efi_detect_disk(SystemTable:Pefi_system_table):efi_disk_interface_list;cdecl;[public,alias:'EFI_DETECT_DISK'];
-var diskiopro:Pointer;
-    i,totalnum:natuint;
-    totalbuf:Pefi_handle;
-    funclist:efi_disk_interface_list;
-begin
- SystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_disk_io_protocol_guid,nil,totalnum,totalbuf);
- funclist.disk_interface:=allocmem(sizeof(Pointer)*1024); funclist.disk_count:=totalnum;
- for i:=1 to totalnum do
-  begin
-   SystemTable^.BootServices^.HandleProtocol((totalbuf+i-1)^,@efi_disk_io_protocol_guid,diskiopro);
-   (funclist.disk_interface+i-1)^:=Pefi_disk_io_protocol(diskiopro);
-  end;
- efi_detect_disk:=funclist;
-end;
-function efi_detect_block(SystemTable:Pefi_system_table):efi_block_interface_list;cdecl;[public,alias:'EFI_DETECT_BLOCK'];
-var blockiopro:Pointer;
-    i,totalnum:natuint;
-    totalbuf:Pefi_handle;
-    funclist:efi_block_interface_list;
-begin
- SystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_block_io_protocol_guid,nil,totalnum,totalbuf);
- funclist.block_interface:=allocmem(sizeof(Pointer)*1024); funclist.block_count:=totalnum;
- for i:=1 to totalnum do
-  begin
-   SystemTable^.BootServices^.HandleProtocol((totalbuf+i-1)^,@efi_block_io_protocol_guid,blockiopro);
-   (funclist.block_interface+i-1)^:=Pefi_block_io_protocol(blockiopro);
-  end;
- efi_detect_block:=funclist;
-end;
-function efi_get_disk_size(Disklist:efi_block_interface_list;number:natuint):natuint;cdecl;[public,alias:'EFI_GET_DISK_SIZE'];
-begin
- efi_get_disk_size:=((Disklist.block_interface+number-1)^)^.Media^.LastBlock*((Disklist.block_interface+number-1)^)^.Media^.BlockSize;
-end;
-function efi_read_disk_format_mbr(DiskList:efi_disk_interface_list;Blocklist:efi_block_interface_list;number:natuint):master_boot_record;cdecl;[public,alias:'EFI_READ_DISK_FORMAT_MBR'];
-var buf:master_boot_record;
-begin
- ((DiskList.disk_interface+number-1)^)^.ReadDisk((DiskList.disk_interface+number-1)^,((blocklist.block_interface+number-1)^)^.Media^.MediaId,0,sizeof(master_boot_record),buf);
- efi_read_disk_format_mbr:=buf;
-end;
-function efi_read_disk_format_gpt(DiskList:efi_disk_interface_list;Blocklist:efi_block_interface_list;number:natuint):efi_gpt_header;cdecl;[public,alias:'EFI_READ_DISK_FORMAT_GPT'];
-var buf:efi_gpt_header;
-begin
- ((DiskList.disk_interface+number-1)^)^.ReadDisk((DiskList.disk_interface+number-1)^,((blocklist.block_interface+number-1)^)^.Media^.MediaId,sizeof(master_boot_record),sizeof(efi_gpt_header),buf);
- efi_read_disk_format_gpt:=buf;
-end;
-function efi_read_disk_gpt_entry_array(DiskList:efi_disk_interface_list;BlockList:efi_block_interface_list;number:natuint):efi_gpt_entry_array;cdecl;[public,alias:'EFI_READ_DISK_GPT_ENTRY_ARRAY'];
-var gea:efi_gpt_entry_array;
-    geablocksize,incblocksize:word;
-    buf:efi_partition_entry;
-    pos:qword;
-    i:natuint;
-begin
- gea.entry_count:=efi_read_disk_format_gpt(DiskList,BlockList,number).NumberOfPartitionEntries;
- geablocksize:=((blocklist.block_interface+number-1)^)^.Media^.Blocksize;
- gea.entry_content:=allocmem(sizeof(efi_partition_entry)*1024);
- incblocksize:=efi_read_disk_format_gpt(DiskList,BlockList,number).sizeofPartitionEntry;
- pos:=((sizeof(master_boot_record)+sizeof(efi_gpt_header)) div geablocksize+1)*geablocksize;
- for i:=1 to gea.entry_count do
-  begin 
-   ((DiskList.disk_interface+number-1)^)^.ReadDisk((DiskList.disk_interface+number-1)^,((blocklist.block_interface+number-1)^)^.Media^.MediaId,pos,incblocksize,buf);
-   (gea.entry_content+i-1)^:=buf;
-   pos:=pos+incblocksize;
-  end;
- efi_read_disk_gpt_entry_array:=gea;
-end;
-procedure efi_clear_disk(DiskList:efi_disk_interface_list;BlockList:efi_block_interface_list;number:natuint);cdecl;[public,alias:'EFI_CLEAR_LIST'];
-var buf:Byte=0;
-    i:qword;
-    status:efi_status;
-begin
- buf:=0;
- for i:=1 to efi_get_disk_size(Blocklist,number) do
-  begin
-   status:=((DiskList.disk_interface+number-1)^)^.WriteDisk((DiskList.disk_interface+number-1)^,((blocklist.block_interface+number-1)^)^.Media^.MediaId,(i-1),1,@buf);
-  end;
-end;
-procedure efi_zone_disk(DiskList:efi_disk_interface_list;BlockList:efi_block_interface_list;number:natuint;partarray:efi_gpt_partition_array);cdecl;[public,alias:'EFI_ZONE_DISK'];
-var i:natuint;
-    blocksize,divnum:word;
-    pos,pos2:qword;
-    fmbr:master_boot_record;
-    fgpt:efi_gpt_header;
-    fepe:efi_partition_entry;
-    partname:PWideChar;
-    status,status2:efi_status;
-begin
- blocksize:=((blocklist.block_interface+number-1)^)^.Media^.Blocksize;
- divnum:=blocksize div 128;
- for i:=1 to 440 do fmbr.BootStrapCode[i]:=0;
- for i:=1 to 4 do fmbr.UniqueMbrSignature[i]:=0;
- for i:=1 to 2 do fmbr.unknown[i]:=0;
- for i:=1 to 4 do
-  begin
-   if(i=1) then
-    begin
-     fmbr.partition[i].bootindicator:=1;
-     fmbr.partition[i].StartHead:=$00;
-     fmbr.partition[i].StartSector:=$02;
-     fmbr.partition[i].StartTrack:=$00;
-     fmbr.partition[i].OSindicator:=$EE;
-     fmbr.partition[i].EndHead:=$FF;
-     fmbr.partition[i].EndSector:=$FF;
-     fmbr.partition[i].EndTrack:=$FF;
-     fmbr.partition[i].StartingLBA:=$00000001;
-     fmbr.partition[i].SizeInLBA:=$FFFFFFFF;
-    end
-   else if(i>1) then
-    begin
-     fmbr.partition[i].bootindicator:=0;
-     fmbr.partition[i].StartHead:=$00;
-     fmbr.partition[i].StartSector:=$00;
-     fmbr.partition[i].StartTrack:=$00;
-     fmbr.partition[i].OSindicator:=$00;
-     fmbr.partition[i].EndHead:=$00;
-     fmbr.partition[i].EndSector:=$00;
-     fmbr.partition[i].EndTrack:=$00;
-     fmbr.partition[i].StartingLBA:=$00000000;
-     fmbr.partition[i].SizeInLBA:=$00000000;
-    end;
-  end;
-  fmbr.Signature:=$AA55;
-  ((DiskList.disk_interface+number-1)^)^.WriteDisk((DiskList.disk_interface+number-1)^,((blocklist.block_interface+number-1)^)^.Media^.MediaId,0,sizeof(master_boot_record),@fmbr);
-  fgpt.signature:=$5459445120494645;
-  fgpt.revision:=$00010000;
-  fgpt.headersize:=92;
-  fgpt.headercrc32:=0;
-  fgpt.reserved:=0;
-  fgpt.myLBA:=1;
-  fgpt.AlternateLBA:=((Blocklist.block_interface+number-1)^)^.Media^.LastBlock;
-  if(partarray.array_count mod 4<>0) then
-   begin
-    fgpt.FirstUsableLBA:=2+partarray.array_count div divnum+1;
-    fgpt.LastUsableLBA:=((Blocklist.block_interface+number-1)^)^.Media^.LastBlock-(partarray.array_count div divnum+2);
-   end
-  else
-   begin
-    fgpt.FirstUsableLBA:=2+partarray.array_count div divnum;
-    fgpt.LastUsableLBA:=((Blocklist.block_interface+number-1)^)^.Media^.LastBlock-(partarray.array_count div divnum+1);
-   end;
-  fgpt.diskguid:=partition_system_guid;
-  fgpt.PartitionEntryLBA:=partarray.array_count;
-  fgpt.NumberOfPartitionEntries:=partarray.array_count;
-  fgpt.sizeofPartitionEntry:=sizeof(efi_partition_entry);
-  fgpt.PartitionEntryArrayCRC32:=0;
-  ((DiskList.disk_interface+number-1)^)^.WriteDisk((DiskList.disk_interface+number-1)^,((blocklist.block_interface+number-1)^)^.Media^.MediaId, sizeof(master_boot_record),sizeof(efi_gpt_header),@fgpt);
-  ((DiskList.disk_interface+number-1)^)^.WriteDisk((DiskList.disk_interface+number-1)^,((blocklist.block_interface+number-1)^)^.Media^.MediaId,(efi_get_disk_size(BlockList,number)-sizeof(efi_gpt_header)) div blocksize*blocksize,sizeof(efi_gpt_header),Pointer(@fgpt));
-  pos:=((sizeof(master_boot_record)+sizeof(efi_gpt_header)) div blocksize+1)*blocksize;
-  pos2:=((efi_get_disk_size(BlockList,number)-sizeof(efi_gpt_header)) div blocksize-partarray.array_count)*blocksize;
-  for i:=1 to partarray.array_count do
-   begin
-    if(i=1) then
-     begin
-      fepe.PartitionTypeGUID:=efi_system_partition_guid;
-      fepe.UniquePartitionGUID:=partition_system_guid;
-      fepe.StartingLBA:=fgpt.FirstUsableLBA+(partarray.array_content+i-1)^.startlba;
-      fepe.EndingLBA:=fgpt.FirstUsableLBA+(partarray.array_content+i-1)^.endlba;
-      fepe.Attributes:=0; 
-     end
-    else
-     begin
-      fepe.PartitionTypeGUID:=partition_system_guid;
-      fepe.UniquePartitionGUID:=partition_system_guid;
-      fepe.StartingLBA:=fgpt.FirstUsableLBA+(partarray.array_content+i-1)^.startlba;
-      fepe.EndingLBA:=fgpt.FirstUsableLBA+(partarray.array_content+i-1)^.endlba;
-      fepe.Attributes:=0; 
-     end;
-    fepe.PartitionName[1]:='Z';
-    fepe.PartitionName[2]:='o';
-    fepe.PartitionName[3]:='n';
-    fepe.PartitionName[4]:='e';
-    fepe.PartitionName[5]:=#0;
-    ((DiskList.disk_interface+number-1)^)^.WriteDisk((DiskList.disk_interface+number-1)^,((blocklist.block_interface+number-1)^)^.Media^.MediaId,pos,sizeof(efi_partition_entry),@fepe);
-    pos:=pos+sizeof(efi_partition_entry);
-    ((DiskList.disk_interface+number-1)^)^.WriteDisk((DiskList.disk_interface+number-1)^,((blocklist.block_interface+number-1)^)^.Media^.MediaId,pos2,sizeof(efi_partition_entry),@fepe);
-    pos2:=pos2+sizeof(efi_partition_entry);
-  end;
-end;
-procedure efi_install_cdrom_to_disk(SystemTable:Pefi_system_table;cdromnumber,disknumber:natuint);cdecl;[public,alias:'EFI_INSTALL_CDROM_TO_DISK'];
-var procbuf:Pointer;
-    funcroot:Pefi_file_protocol;
-    totalnum:natuint;
-    totalbuf:Pefi_handle;
-    myinfosize,myfssize,contentsize:natuint;
-    myinfo:efi_file_info;
-    DiskList:efi_disk_interface_list;
-    Blocklist:efi_block_interface_list;
-    gea:efi_gpt_entry_array;  
-    status:natint;
-begin
- DiskList:=efi_detect_disk(SystemTable); BlockList:=efi_detect_block(SystemTable); 
- gea:=efi_read_disk_gpt_entry_array(DiskList,BlockList,disknumber); 
- if(gea.entry_count=0) or (gea.entry_count=1) then exit;
- SystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_simple_file_system_protocol_guid,nil,totalnum,totalbuf);
- if(cdromnumber>totalnum) then exit;
- SystemTable^.BootServices^.HandleProtocol((totalbuf+cdromnumber-1)^,@efi_simple_file_system_protocol_guid,procbuf);
- Pefi_simple_file_system_protocol(procbuf)^.OpenVolume(Pefi_simple_file_system_protocol(procbuf),funcroot);
- myinfosize:=sizeof(efi_file_info);
- status:=funcroot^.Open(funcroot,funcroot,'\EFI\BOOT\bootx64.efi',EFI_FILE_MODE_READ,0);
- if(status<>efi_success) then 
-  begin
-   efi_console_output_string(systemtable,'ERROR1!'+#13#10);
-   exit;
-  end;
- status:=funcroot^.GetInfo(funcroot,@efi_file_info_id,myinfosize,myinfo);
- if(status<>efi_success) then 
-  begin
-   efi_console_output_string(systemtable,'ERROR2!'+#13#10);
-   exit;
-  end;
- contentsize:=16777216; 
- status:=funcroot^.efiRead(funcroot,contentsize,content);
- efi_console_output_string(systemtable,UintToPWChar(contentsize));
- efi_console_output_string(systemtable,#13#10);
- status:=((DiskList.disk_interface+disknumber-1)^)^.WriteDisk((DiskList.disk_interface+disknumber-1)^,
- ((blocklist.block_interface+disknumber-1)^)^.Media^.MediaId,gea.entry_content^.StartingLBA*512,contentsize,@content);
- if(status<>efi_success) then 
-  begin
-   efi_console_output_string(systemtable,'ERROR3!'+#13#10);
-   exit;
-  end;
- funcroot^.Close(funcroot);
- efi_console_output_string(systemtable,'ENDED'+#13#10);
-end;
 function efi_list_all_file_system(SystemTable:Pefi_system_table):efi_file_system_list;cdecl;[public,alias:'EFI_LIST_ALL_FILE_SYSTEM'];
 var totalnum,i:natuint;
     totalbuf:Pefi_handle;
@@ -1823,6 +1662,297 @@ begin
    (data.file_system_content+i-1)^:=Pefi_simple_file_system_protocol(sfspp);
   end;
  efi_list_all_file_system:=data;
+end;
+function efi_list_all_file_system_ext(SystemTable:Pefi_system_table):efi_file_system_list_ext;cdecl;[public,alias:'EFI_LIST_ALL_FILE_SYSTEM_EXT'];
+var totalnum,i:natuint;
+    totalbuf:Pefi_handle;
+    sfspp:Pointer;
+    fp:Pefi_file_protocol;
+    data:efi_file_system_list_ext;
+    fsinfo:efi_file_system_info;
+    realsize:natuint;
+begin
+ SystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_simple_file_system_protocol_guid,nil,totalnum,totalbuf);
+ data.fsrcontent:=allocmem(sizeof(Pointer)*1024); data.fsrcount:=0;
+ data.fsrwcontent:=allocmem(sizeof(Pointer)*1024); data.fsrwcount:=0;
+ for i:=1 to totalnum do
+  begin
+   SystemTable^.BootServices^.HandleProtocol((totalbuf+i-1)^,@efi_simple_file_system_protocol_guid,sfspp);
+   Pefi_simple_file_system_protocol(sfspp)^.OpenVolume(Pefi_simple_file_system_protocol(sfspp),fp);
+   realsize:=sizeof(efi_file_system_info);
+   fp^.GetInfo(fp,@efi_file_system_info_id,realsize,fsinfo);
+   if(fsinfo.ReadOnly) then
+    begin
+     inc(data.fsrcount);
+     (data.fsrcontent+data.fsrcount-1)^:=Pefi_simple_file_system_protocol(sfspp);
+    end
+   else
+    begin
+     inc(data.fsrwcount);
+     (data.fsrwcontent+data.fsrwcount-1)^:=Pefi_simple_file_system_protocol(sfspp);
+    end;
+  end;
+ efi_list_all_file_system_ext:=data;
+end;
+function efi_detect_disk_write_ability(SystemTable:Pefi_system_table):efi_disk_list;cdecl;[public,alias:'EFI_DETECT_DISK_WRITE_ABILITY'];
+var tnum1,tnum2,i:natuint;
+    tbuf1,tbuf2:Pefi_handle;
+    p1,p2:Pointer;
+    mydata1:PNatuint;
+    mydata2:natuint;
+    reslist:efi_disk_list;
+    status:efi_status;
+begin
+ SystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_disk_io_protocol_guid,nil,tnum1,tbuf1);
+ SystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_block_io_protocol_guid,nil,tnum2,tbuf2);
+ reslist.disk_content:=allocmem(1024*sizeof(Pointer)); 
+ reslist.disk_block_content:=allocmem(1024*sizeof(Pointer)); 
+ reslist.disk_count:=0;
+ for i:=1 to tnum1 do
+  begin
+   SystemTable^.BootServices^.HandleProtocol((tbuf1+i-1)^,@efi_disk_io_protocol_guid,p1);
+   SystemTable^.BootServices^.HandleProtocol((tbuf2+i-1)^,@efi_block_io_protocol_guid,p2);
+   mydata1:=allocmem(8);
+   mydata1^:=1012;
+   Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,8,mydata2);
+   status:=Pefi_disk_io_protocol(p1)^.WriteDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,8,mydata1);
+   if(status=efi_success) then
+    begin
+     Pefi_disk_io_protocol(p1)^.WriteDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,8,@mydata2);
+     Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,sizeof(master_boot_record),rmbr);
+     Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,
+     Pefi_block_io_protocol(p2)^.Media^.BlockSize,Pefi_block_io_protocol(p2)^.Media^.BlockSize,rgpt1);
+     Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,
+     Pefi_block_io_protocol(p2)^.Media^.BlockSize*Pefi_block_io_protocol(p2)^.Media^.LastBlock,
+     Pefi_block_io_protocol(p2)^.Media^.BlockSize,rgpt2);
+     if(rmbr.Partition[1].OStype=$EE) and ((rgpt1.signature=$5452415020494645) or (rgpt2.signature=$5452415020494645)) then continue;
+     inc(reslist.disk_count);
+     (reslist.disk_content+reslist.disk_count-1)^:=Pefi_disk_io_protocol(p1);
+     (reslist.disk_block_content+reslist.disk_count-1)^:=Pefi_block_io_protocol(p2);
+    end;
+   freemem(mydata1);
+  end;
+ efi_detect_disk_write_ability:=reslist;
+end;
+procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;filesystemlist:efi_file_system_list;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);cdecl;[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK'];
+var i,j,lastblock,blocksize,mediaid,diskwritepos:natuint;
+    zero:byte;
+    sfsp:Pefi_simple_file_system_protocol;
+    fp:Pefi_file_protocol;
+    efsi:efi_file_system_info;
+    readsize:natuint;
+    diop:Pefi_disk_io_protocol;
+    status:efi_status;
+begin
+ sfsp:=(filesystemlist.file_system_content+cdromindex-1)^; zero:=0;
+ for i:=1 to disklist.disk_count do
+  begin
+   diop:=(disklist.disk_content+i-1)^;
+   blocksize:=((disklist.disk_block_content+i-1)^)^.Media^.BlockSize;
+   lastblock:=((disklist.disk_block_content+i-1)^)^.Media^.LastBlock;
+   diskwritepos:=0;
+   for j:=1 to 440 do mbr.BootStrapCode[j]:=0;
+   mbr.UniqueMbrSignature:=0; mbr.Unknown:=0;
+   for j:=1 to 4 do
+    begin 
+     if(j=1) then
+      begin
+       mbr.Partition[j].BootIndicator:=$05;
+       mbr.Partition[j].StartingCHS[1]:=$00;
+       mbr.Partition[j].StartingCHS[2]:=$02;
+       mbr.Partition[j].StartingCHS[3]:=$00;
+       mbr.Partition[j].OSType:=$EE;
+       mbr.Partition[j].EndingCHS[1]:=$FF;
+       mbr.Partition[j].EndingCHS[2]:=$FF;
+       mbr.Partition[j].EndingCHS[3]:=$FF;
+       mbr.Partition[j].StartingLBA:=$00000001;
+       mbr.Partition[j].SizeInLBA:=LastBlock;
+      end
+     else if(j>1) then
+      begin
+       mbr.Partition[j].BootIndicator:=$00;
+       mbr.Partition[j].StartingCHS[1]:=$00;
+       mbr.Partition[j].StartingCHS[2]:=$00;
+       mbr.Partition[j].StartingCHS[3]:=$00;
+       mbr.Partition[j].OSType:=$00;
+       mbr.Partition[j].EndingCHS[1]:=$00;
+       mbr.Partition[j].EndingCHS[2]:=$00;
+       mbr.Partition[j].EndingCHS[3]:=$00;
+       mbr.Partition[j].StartingLBA:=$00000000;
+       mbr.Partition[j].SizeInLBA:=$00000000;
+      end;
+    end;
+   mbr.signature:=$AA55;
+   gpt.signature:=$5452415020494645;
+   gpt.revision:=$00010000;
+   gpt.headersize:=92;
+   gpt.headercrc32:=0;
+   gpt.reserved1:=0;
+   gpt.MyLBA:=1; 
+   gpt.AlternateLBA:=lastblock;
+   gpt.FirstUsableLBA:=2+128 div (blocksize div 128); 
+   gpt.LastUsableLBA:=gpt.AlternateLBA-128 div (blocksize div 128)-1;
+   gpt.DiskGuid:=tydq_disk_guid;
+   gpt.PartitionEntryLBA:=2;
+   gpt.NumberOfPartitionEntries:=128;
+   gpt.SizeOfPartitionEntry:=128;
+   gpt.PartitionEntryArrayCRC32:=0;
+   epe.epe_count:=128;
+   if(blocksize>92) then for j:=1 to blocksize-92 do gpt.reserved2[j]:=0;
+   if(i=harddiskindex) then
+    begin
+     for j:=1 to 128 do
+      begin
+       if(j=1) then
+        begin
+         epe.epe_content[j].PartitionTypeGUID:=efi_system_partition_guid;
+         epe.epe_content[j].UniquePartitionGUID:=tydq_efi_system_partition_guid;
+         epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA;
+         epe.epe_content[j].EndingLBA:=gpt.FirstUsableLBA+1024*100 div (blocksize div 512)-1;
+         epe.epe_content[j].Attributes:=0;
+         epe.epe_content[j].PartitionName[1]:='E';
+         epe.epe_content[j].PartitionName[2]:='F';
+         epe.epe_content[j].PartitionName[3]:='I';
+         epe.epe_content[j].PartitionName[4]:=#0;
+        end
+       else if(j=2) then
+        begin
+         epe.epe_content[j].PartitionTypeGUID:=tydq_system_guid;
+         epe.epe_content[j].UniquePartitionGUID:=tydq_system_guid;
+         epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA+1024*100 div (blocksize div 512);
+         epe.epe_content[j].EndingLBA:=gpt.LastUsableLBA;
+         epe.epe_content[j].Attributes:=0;
+         epe.epe_content[j].PartitionName[1]:='T';
+         epe.epe_content[j].PartitionName[2]:='Y';
+         epe.epe_content[j].PartitionName[3]:='D';
+         epe.epe_content[j].PartitionName[4]:='Q';
+         epe.epe_content[j].PartitionName[5]:=#0;
+        end
+       else if(j>2) then
+        begin
+         epe.epe_content[j].PartitionTypeGUID:=unused_entry_guid;
+         epe.epe_content[j].UniquePartitionGUID:=unused_entry_guid;
+         epe.epe_content[j].StartingLBA:=0;
+         epe.epe_content[j].EndingLBA:=0;
+         epe.epe_content[j].Attributes:=0;
+         epe.epe_content[j].PartitionName[1]:=#0;
+        end;
+      end;
+    end
+   else if(i<>harddiskindex) then
+    begin
+     for j:=1 to 128 do
+      begin
+       if(j=1) then
+        begin
+         epe.epe_content[j].PartitionTypeGUID:=tydq_system_guid;
+         epe.epe_content[j].UniquePartitionGUID:=tydq_system_guid;
+         epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA;
+         epe.epe_content[j].EndingLBA:=gpt.LastUsableLBA;
+         epe.epe_content[j].Attributes:=0;
+         epe.epe_content[j].PartitionName[1]:='T';
+         epe.epe_content[j].PartitionName[2]:='Y';
+         epe.epe_content[j].PartitionName[3]:='D';
+         epe.epe_content[j].PartitionName[4]:='Q';
+         epe.epe_content[j].PartitionName[5]:=#0;
+        end  
+       else if(j>1) then
+        begin
+         epe.epe_content[j].PartitionTypeGUID:=unused_entry_guid;
+         epe.epe_content[j].UniquePartitionGUID:=unused_entry_guid;
+         epe.epe_content[j].StartingLBA:=0;
+         epe.epe_content[j].EndingLBA:=0;
+         epe.epe_content[j].Attributes:=0;
+         epe.epe_content[j].PartitionName[1]:=#0;
+        end;
+      end;
+    end;
+   SystemTable^.BootServices^.CalculateCrc32(@epe.epe_content,sizeof(epe.epe_content),gpt.PartitionEntryArrayCRC32);
+   SystemTable^.BootServices^.CalculateCrc32(@gpt,gpt.headersize,gpt.headercrc32);
+   diop^.WriteDisk(diop,mediaid,0,sizeof(master_boot_record),@mbr);
+   if(blocksize>512) then for j:=512 to blocksize-1 do diop^.WriteDisk(diop,mediaid,j,1,@zero);
+   diskwritepos:=blocksize;
+   diop^.WriteDisk(diop,mediaid,diskwritepos,blocksize,@gpt);
+   diop^.WriteDisk(diop,mediaid,blocksize*lastblock,blocksize,@gpt);
+   diskwritepos:=blocksize*2;
+   diop^.WriteDisk(diop,mediaid,diskwritepos,sizeof(epe.epe_content),@epe.epe_content);
+   diop^.WriteDisk(diop,mediaid,blocksize*lastblock-blocksize*(128 div (blocksize div 128)),sizeof(epe.epe_content),@epe.epe_content);
+   if(i=harddiskindex) then
+    begin
+     fat32h.JumpOrder[1]:=$EB; fat32h.JumpOrder[2]:=$58; fat32h.JumpOrder[3]:=$90;
+     fat32h.OemCode[1]:='T'; fat32h.OemCode[2]:='Y'; fat32h.OemCode[3]:='D'; fat32h.OemCode[4]:='Q';
+     fat32h.OemCode[5]:='O'; fat32h.OemCode[6]:='S'; fat32h.OemCode[7]:=' '; fat32h.OemCode[8]:=#0;
+     fat32h.BytesPerSector:=blocksize; 
+     fat32h.SectorPerCluster:=128;
+     fat32h.ReservedSectorCount:=4+256 div (blocksize div 512); 
+     fat32h.NumFATs:=2;
+     fat32h.RootEntryCount:=0; 
+     fat32h.TotalSector16:=0; 
+     fat32h.Media:=$F8;
+     fat32h.FATSectors16:=0; 
+     fat32h.SectorPerTrack:=0; 
+     fat32h.NumHeads:=0;
+     fat32h.HiddenSectors:=0; 
+     fat32h.TotalSectors32:=1024*100 div (blocksize div 512); 
+     fat32h.FATSector32:=128 div (blocksize div 512);
+     fat32h.ExtendedFlags:=0; 
+     fat32h.filesystemVersion:=0; 
+     fat32h.RootCluster:=2;
+     fat32h.FileSystemInfo:=1; 
+     fat32h.BootSector:=6; 
+     for j:=1 to 12 do fat32h.Reserved[j]:=0; 
+     fat32h.DriverNumber:=$00; 
+     fat32h.Reserved1:=0;
+     fat32h.BootSignature:=$29; 
+     fat32h.VolumeID:=0;
+     fat32h.VolumeLabel[1]:='E'; fat32h.VolumeLabel[2]:='F'; fat32h.VolumeLabel[3]:='I'; fat32h.VolumeLabel[4]:=' '; 
+     fat32h.VolumeLabel[5]:='P'; fat32h.VolumeLabel[6]:='A'; fat32h.VolumeLabel[7]:='R'; fat32h.VolumeLabel[8]:='T'; 
+     fat32h.VolumeLabel[9]:=' '; fat32h.VolumeLabel[10]:=' '; fat32h.VolumeLabel[11]:=#0;
+     fat32h.FileSystemType[1]:='F'; fat32h.FileSystemType[2]:='A'; fat32h.FileSystemType[3]:='T';
+     fat32h.FileSystemType[4]:='3'; fat32h.FileSystemType[5]:='2'; fat32h.FileSystemType[6]:=' ';
+     fat32h.FileSystemType[7]:=' '; fat32h.FileSystemType[8]:=#0;
+     for j:=1 to 420 do fat32h.Reserved2[j]:=0;
+     fat32h.SignatureWord:=$AA55;
+     if(BlockSize>512) then for j:=1 to BlockSize-512 do fat32h.Reserved3[j]:=0;
+     fat32fs.FSI_leadsig:=$41615252; 
+     for j:=1 to 480 do fat32fs.FSI_Reserved1[j]:=0;
+     fat32fs.FSI_StrucSig:=$61417272;
+     fat32fs.FSI_FreeCount:=100*1024 div (blocksize div 512)-128 div (blocksize div 512)-2; 
+     fat32fs.FSI_NextFree:=2;
+     for j:=1 to 12 do fat32fs.FSI_Reserved2[j]:=0;
+     fat32fs.FSI_TrailSig:=$AA550000;
+     if(BlockSize>512) then for j:=1 to BlockSize-512 do fat32fs.FSI_Reserved3[j]:=0;
+     diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize,blocksize,@fat32h);
+     diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+blocksize,blocksize,@fat32fs);
+    end;
+  end;
+end;
+procedure efi_install_cdrom_to_hard_disk_stage2(systemtable:Pefi_system_table;efslext:efi_file_system_list_ext;inscd,insdisk:natuint);cdecl;[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK_STAGE2'];
+var fsp1,fsp2:Pefi_simple_file_system_protocol;
+    fp1,fp2:Pefi_file_protocol;
+    fpinfo:efi_file_info;
+    realsize:natuint;
+    status:efi_status;
+begin
+ fsp1:=(efslext.fsrcontent+inscd-1)^; fsp2:=(efslext.fsrwcontent+insdisk-1)^;
+ fsp1^.OpenVolume(fsp1,fp1); fsp2^.OpenVolume(fsp2,fp2);
+ status:=fp2^.Open(fp2,fp2,'\',efi_file_mode_create,efi_file_directory);
+ if(status=efi_success) then efi_console_output_string(systemtable,'SUCCESS1'#13#10);
+ status:=fp2^.Open(fp2,fp2,'\EFI',efi_file_mode_create,efi_file_directory);
+ if(status=efi_success) then efi_console_output_string(systemtable,'SUCCESS1'#13#10);
+ status:=fp2^.Open(fp2,fp2,'\EFI\BOOT',efi_file_mode_create,efi_file_directory);
+ if(status=efi_success) then efi_console_output_string(systemtable,'SUCCESS2'#13#10);
+ fp1^.Open(fp1,fp1,'\EFI\SETUP\bootx64.efi',efi_file_mode_read,0);
+ status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootx64.efi',efi_file_mode_create or efi_file_mode_read or efi_file_mode_write,efi_file_system);
+ if(status=efi_success) then efi_console_output_string(systemtable,'SUCCESS3'#13#10);
+ realsize:=sizeof(efi_file_info);
+ fp1^.GetInfo(fp1,@efi_file_info_id,realsize,fpinfo);
+ realsize:=fpinfo.FileSize;
+ fp1^.efiRead(fp1,realsize,content);
+ status:=fp2^.efiWrite(fp2,realsize,@content);
+ if(status=efi_success) then efi_console_output_string(systemtable,'SUCCESS4'#13#10);
+ fp1^.Close(fp1); 
+ fp2^.Close(fp2);
 end;
 
 end.

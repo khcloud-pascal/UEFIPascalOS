@@ -1,16 +1,14 @@
 unit system;
 {$MODE FPC}
 
-{$MEMORY 1073741824 2147483648}
-
 {$POINTERMATH ON}
 interface
 {$IFDEF CPU32}
 const maxheap=16777216*4;
-      maxsection=16384;
+      maxsection=16384*4;
 {$ELSE CPU32}
 const maxheap=67108864*4;
-      maxsection=65536;
+      maxsection=65536*4;
 {$ENDIF CPU32}
 type
   hresult = LongInt;
@@ -360,6 +358,8 @@ function strcmp(str1,str2:Pchar):natint;[public,alias:'strcmp'];
 var i:natint;
 begin
  i:=0;
+ if(strlen(str1)>strlen(str2)) then strcmp:=1
+ else if(Strlen(str1)<strlen(str2)) then strcmp:=-1;
  while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
  if((str1+i)^>(str2+i)^) then strcmp:=1
  else if((str1+i)^<(str2+i)^) then strcmp:=-1
@@ -369,6 +369,8 @@ function Wstrcmp(str1,str2:PwideChar):natint;[public,alias:'Wstrcmp'];
 var i:natint;
 begin
  i:=0;
+ if(Wstrlen(str1)>Wstrlen(str2)) then Wstrcmp:=1
+ else if(WStrlen(str1)<Wstrlen(str2)) then Wstrcmp:=-1;
  while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
  if((str1+i)^>(str2+i)^) then Wstrcmp:=1
  else if((str1+i)^<(str2+i)^) then Wstrcmp:=-1
@@ -636,10 +638,10 @@ function IntToPChar(int:natint):PChar;[public,alias:'IntToPChar'];
 const numchar:Pchar='0123456789';
 var negative:boolean=false;
     procnum:natint;
-    mystr:array[1..21] of char;
+    mystr:Pchar;
     myrightnum:natint=20;
 begin
- mystr[21]:=#0;
+ procnum:=int; strinit(mystr,20);
  if(int<0) then
   begin
    procnum:=-int;
@@ -647,29 +649,29 @@ begin
   end;
  repeat 
   begin
-   mystr[myrightnum]:=(numchar+procnum mod 10)^;
+   (mystr+myrightnum-1)^:=(numchar+procnum mod 10)^;
    dec(myrightnum);
    procnum:=procnum div 10;
   end;
  until (procnum=0);
  if(negative=true)then 
   begin
-   mystr[myrightnum]:='-';
-   IntToPChar:=@mystr[myrightnum];
+   (mystr+myrightnum-1)^:='-';
+   IntToPChar:=mystr+myrightnum-1;
   end
  else
   begin
-   IntToPChar:=@mystr[myrightnum+1];
+   IntToPChar:=mystr+myrightnum;
   end;
 end;
 function IntToPWChar(int:natint):PWideChar;[public,alias:'IntToPWChar'];
 const numchar:PWidechar='0123456789';
 var negative:boolean=false;
     procnum:natint;
-    mystr:array[1..21] of Widechar;
+    mystr:PWidechar;
     myrightnum:natint=20;
 begin
- mystr[21]:=#0;
+ procnum:=int; Wstrinit(mystr,20);
  if(int<0) then
   begin
    procnum:=-int;
@@ -677,19 +679,19 @@ begin
   end;
  repeat 
   begin
-   mystr[myrightnum]:=(numchar+procnum mod 10)^;
+   (mystr+myrightnum-1)^:=(numchar+procnum mod 10)^;
    dec(myrightnum);
    procnum:=procnum div 10;
   end;
  until (procnum=0);
  if(negative=true)then 
   begin
-   mystr[myrightnum]:='-';
-   IntToPWChar:=@mystr[myrightnum];
+   (mystr+myrightnum-1)^:='-';
+   IntToPWChar:=mystr+myrightnum-1;
   end
  else
   begin
-   IntToPWChar:=@mystr[myrightnum+1];
+   IntToPWChar:=mystr+myrightnum;
   end;
 end;
 function PCharToInt(str:PChar):natint;[public,alias:'PCharToInt'];
