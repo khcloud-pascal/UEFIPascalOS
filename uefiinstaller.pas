@@ -149,7 +149,6 @@ begin
     end;
    efi_install_cdrom_to_hard_disk_stage2(systemtable,efslext,cdindex,hdindex);
    efi_console_output_string(systemtable,'Stage 2 Install done!Now you can restart your installer to enter the system!'+#13#10);
-   while(True) do;
    SystemTable^.RuntimeServices^.ResetSystem(EfiResetWarm,efi_success,0,nil);
   end;
  efi_main:=efi_success;

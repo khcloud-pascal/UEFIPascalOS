@@ -151,8 +151,8 @@ type efi_lba=qword;
      PPefi_event=^Pefi_event;
      efi_physical_address=qword;
      efi_virtual_address=qword;
-     efi_status=Natint;
-     Pefi_status=^Natint;
+     efi_status=Natuint;
+     Pefi_status=^Natuint;
      efi_input_key=record
                    scancode:word;
                    UnicodeChar:WideChar;
@@ -1171,47 +1171,47 @@ const unused_entry_guid:efi_guid=(data1:$00000000;data2:$0000;data3:$0000;data4:
       efi_partition_info_protocol_guid:efi_guid=(data1:$8CF2F62C;data2:$BC9B;data3:$4821;data4:($80,$8D,$EC,$9E,$C4,$21,$A1,$A0));
       efi_nvdimm_label_protocol_guid:efi_guid=(data1:$D40B6B80;data2:$97D5;data3:$4282;data4:($BB,$1D,$22,$3A,$16,$91,$80,$58));
       efi_ufs_device_config_guid:efi_guid=(data1:$B81BFAB0;data2:$0EB3;data3:$4CF9;data4:($84,$65,$7F,$A9,$86,$36,$16,$64));
-      efi_success:natint=0;
-      efi_load_error:natint=-1;
-      efi_invaild_parameter:natint=-2;
-      efi_unsupported:natint=-3;
-      efi_bad_buffer_size:natint=-4;
-      efi_buffer_too_small:natint=-5;
-      efi_not_ready:natint=-6;
-      efi_device_error:natint=-7;
-      efi_write_protected:natint=-8;
-      efi_out_of_resources:natint=-9;
-      efi_volume_corrupted:natint=-10;
-      efi_volume_full:natint=-11;
-      efi_no_media:natint=-12;
-      efi_media_changed:natint=-13;
-      efi_not_found:natint=-14;
-      efi_access_denied:natint=-15;
-      efi_no_response:natint=-16;
-      efi_no_mapping:natint=-17;
-      efi_timeout:natint=-18;
-      efi_not_started:natint=-19;
-      efi_already_started:natint=-20;
-      efi_aborted:natint=-21;
-      efi_icmp_error:natint=-22;
-      efi_tftp_error:natint=-23;
-      efi_protocol_error:natint=-24;
-      efi_incompatible_version:natint=-25;
-      efi_security_violation:natint=-26;
-      efi_crc_error:natint=-27;
-      efi_end_of_media:natint=-28;
-      efi_end_of_file:natint=-31;
-      efi_invaild_language:natint=-32;
-      efi_compromised_data:natint=-33;
-      efi_ip_address_conflict:natint=-34;
-      efi_http_error:natint=-35;
-      efi_warn_unknown_glyph:natint=1;
-      efi_warn_delete_failure:natint=2;
-      efi_warn_write_failure:natint=3;
-      efi_warn_buffer_too_small:natint=4;
-      efi_warn_stale_data:natint=5;
-      efi_warn_file_system:natint=6;
-      efi_warn_reset_required:natint=7;
+      efi_success:natuint=0;
+      efi_load_error:natuint=-1;
+      efi_invaild_parameter:natuint=-2;
+      efi_unsupported:natuint=-3;
+      efi_bad_buffer_size:natuint=-4;
+      efi_buffer_too_small:natuint=-5;
+      efi_not_ready:natuint=-6;
+      efi_device_error:natuint=-7;
+      efi_write_protected:natuint=-8;
+      efi_out_of_resources:natuint=-9;
+      efi_volume_corrupted:natuint=-10;
+      efi_volume_full:natuint=-11;
+      efi_no_media:natuint=-12;
+      efi_media_changed:natuint=-13;
+      efi_not_found:natuint=-14;
+      efi_access_denied:natuint=-15;
+      efi_no_response:natuint=-16;
+      efi_no_mapping:natuint=-17;
+      efi_timeout:natuint=-18;
+      efi_not_started:natuint=-19;
+      efi_already_started:natuint=-20;
+      efi_aborted:natuint=-21;
+      efi_icmp_error:natuint=-22;
+      efi_tftp_error:natuint=-23;
+      efi_protocol_error:natuint=-24;
+      efi_incompatible_version:natuint=-25;
+      efi_security_violation:natuint=-26;
+      efi_crc_error:natuint=27;
+      efi_end_of_media:natuint=28;
+      efi_end_of_file:natuint=31;
+      efi_invaild_language:natuint=32;
+      efi_compromised_data:natuint=33;
+      efi_ip_address_conflict:natuint=34;
+      efi_http_error:natuint=35;
+      efi_warn_unknown_glyph:natuint=1;
+      efi_warn_delete_failure:natuint=2;
+      efi_warn_write_failure:natuint=3;
+      efi_warn_buffer_too_small:natuint=4;
+      efi_warn_stale_data:natuint=5;
+      efi_warn_file_system:natuint=6;
+      efi_warn_reset_required:natuint=7;
       efi_black=$0;
       efi_blue=$1;
       efi_green=$2;
@@ -1325,6 +1325,7 @@ const unused_entry_guid:efi_guid=(data1:$00000000;data2:$0000;data3:$0000;data4:
       cdw13_vaild:byte=$20;
       cdw14_vaild:byte=$40;
       cdw15_vaild:byte=$80;
+
 function efi_error(status:efi_status):boolean;cdecl;
 procedure efi_console_clear_screen(SystemTable:Pefi_system_table);cdecl;
 procedure efi_console_output_string(SystemTable:Pefi_system_table;outputstring:PWideChar);cdecl;
@@ -1364,7 +1365,7 @@ implementation
 
 function efi_error(status:efi_status):boolean;cdecl;[public,alias:'EFI_ERROR'];
 begin
- if(status>=0) then efi_error:=false else if(status<0) then efi_error:=true;
+ if(natint(status)>=0) then efi_error:=false else if(natint(status)<0) then efi_error:=true;
 end;
 procedure efi_console_clear_screen(SystemTable:Pefi_system_table);cdecl;[public,alias:'EFI_CONSOLE_CLEAR_SCREEN'];
 begin
@@ -1735,7 +1736,8 @@ begin
  efi_detect_disk_write_ability:=reslist;
 end;
 procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;filesystemlist:efi_file_system_list;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);cdecl;[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK'];
-var i,j,lastblock,blocksize,mediaid,diskwritepos:natuint;
+var i,j,lastblock,blocksize,mediaid,diskwritepos,FirstDataSector:natuint;
+    tmpv1,tmpv2,tmpv3:natuint;
     zero:byte;
     sfsp:Pefi_simple_file_system_protocol;
     fp:Pefi_file_protocol;
@@ -1808,7 +1810,7 @@ begin
          epe.epe_content[j].PartitionTypeGUID:=efi_system_partition_guid;
          epe.epe_content[j].UniquePartitionGUID:=tydq_efi_system_partition_guid;
          epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA;
-         epe.epe_content[j].EndingLBA:=gpt.FirstUsableLBA+1024*100 div (blocksize div 512)-1;
+         epe.epe_content[j].EndingLBA:=gpt.FirstUsableLBA+256*1024 div (blocksize div 512)-1;
          epe.epe_content[j].Attributes:=0;
          epe.epe_content[j].PartitionName[1]:='E';
          epe.epe_content[j].PartitionName[2]:='F';
@@ -1819,7 +1821,7 @@ begin
         begin
          epe.epe_content[j].PartitionTypeGUID:=tydq_system_guid;
          epe.epe_content[j].UniquePartitionGUID:=tydq_system_guid;
-         epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA+1024*100 div (blocksize div 512);
+         epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA+256*1024 div (blocksize div 512);
          epe.epe_content[j].EndingLBA:=gpt.LastUsableLBA;
          epe.epe_content[j].Attributes:=0;
          epe.epe_content[j].PartitionName[1]:='T';
@@ -1881,76 +1883,116 @@ begin
     begin
      fat32h.JumpOrder[1]:=$EB; fat32h.JumpOrder[2]:=$58; fat32h.JumpOrder[3]:=$90;
      fat32h.OemCode[1]:='T'; fat32h.OemCode[2]:='Y'; fat32h.OemCode[3]:='D'; fat32h.OemCode[4]:='Q';
-     fat32h.OemCode[5]:='O'; fat32h.OemCode[6]:='S'; fat32h.OemCode[7]:=' '; fat32h.OemCode[8]:=#0;
+     fat32h.OemCode[5]:='O'; fat32h.OemCode[6]:='S'; fat32h.OemCode[7]:=' '; fat32h.OemCode[8]:=' ';
      fat32h.BytesPerSector:=blocksize; 
-     fat32h.SectorPerCluster:=128;
-     fat32h.ReservedSectorCount:=4+256 div (blocksize div 512); 
+     fat32h.SectorPerCluster:=1;
+     fat32h.ReservedSectorCount:=32;
      fat32h.NumFATs:=2;
      fat32h.RootEntryCount:=0; 
      fat32h.TotalSector16:=0; 
      fat32h.Media:=$F8;
      fat32h.FATSectors16:=0; 
-     fat32h.SectorPerTrack:=0; 
-     fat32h.NumHeads:=0;
+     fat32h.SectorPerTrack:=32; 
+     fat32h.NumHeads:=8;
      fat32h.HiddenSectors:=0; 
-     fat32h.TotalSectors32:=1024*100 div (blocksize div 512); 
-     fat32h.FATSector32:=128 div (blocksize div 512);
+     fat32h.TotalSectors32:=1024*256 div (blocksize shr 9); 
+     fat32h.FATSector32:=1024 div (blocksize shr 9);
      fat32h.ExtendedFlags:=0; 
      fat32h.filesystemVersion:=0; 
-     fat32h.RootCluster:=2;
+     fat32h.RootCluster:=fat32h.ReservedSectorCount;
      fat32h.FileSystemInfo:=1; 
      fat32h.BootSector:=6; 
      for j:=1 to 12 do fat32h.Reserved[j]:=0; 
-     fat32h.DriverNumber:=$00; 
+     fat32h.DriverNumber:=$80; 
      fat32h.Reserved1:=0;
      fat32h.BootSignature:=$29; 
-     fat32h.VolumeID:=0;
+     fat32h.VolumeID:=$4067AD4D;
      fat32h.VolumeLabel[1]:='E'; fat32h.VolumeLabel[2]:='F'; fat32h.VolumeLabel[3]:='I'; fat32h.VolumeLabel[4]:=' '; 
      fat32h.VolumeLabel[5]:='P'; fat32h.VolumeLabel[6]:='A'; fat32h.VolumeLabel[7]:='R'; fat32h.VolumeLabel[8]:='T'; 
-     fat32h.VolumeLabel[9]:=' '; fat32h.VolumeLabel[10]:=' '; fat32h.VolumeLabel[11]:=#0;
+     fat32h.VolumeLabel[9]:=' '; fat32h.VolumeLabel[10]:=' '; fat32h.VolumeLabel[11]:=' ';
      fat32h.FileSystemType[1]:='F'; fat32h.FileSystemType[2]:='A'; fat32h.FileSystemType[3]:='T';
      fat32h.FileSystemType[4]:='3'; fat32h.FileSystemType[5]:='2'; fat32h.FileSystemType[6]:=' ';
-     fat32h.FileSystemType[7]:=' '; fat32h.FileSystemType[8]:=#0;
+     fat32h.FileSystemType[7]:=' '; fat32h.FileSystemType[8]:=' ';
      for j:=1 to 420 do fat32h.Reserved2[j]:=0;
      fat32h.SignatureWord:=$AA55;
      if(BlockSize>512) then for j:=1 to BlockSize-512 do fat32h.Reserved3[j]:=0;
      fat32fs.FSI_leadsig:=$41615252; 
      for j:=1 to 480 do fat32fs.FSI_Reserved1[j]:=0;
      fat32fs.FSI_StrucSig:=$61417272;
-     fat32fs.FSI_FreeCount:=100*1024 div (blocksize div 512)-128 div (blocksize div 512)-2; 
-     fat32fs.FSI_NextFree:=2;
+     fat32fs.FSI_FreeCount:=1024*256 div (blocksize shr 9)-fat32h.ReservedSectorCount; 
+     fat32fs.FSI_NextFree:=fat32h.ReservedSectorCount;
      for j:=1 to 12 do fat32fs.FSI_Reserved2[j]:=0;
      fat32fs.FSI_TrailSig:=$AA550000;
      if(BlockSize>512) then for j:=1 to BlockSize-512 do fat32fs.FSI_Reserved3[j]:=0;
      diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize,blocksize,@fat32h);
      diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+blocksize,blocksize,@fat32fs);
+     diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+blocksize*6,blocksize,@fat32h);
+     diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+blocksize*7,blocksize,@fat32fs);
+    end
+   else
+    begin
     end;
   end;
 end;
 procedure efi_install_cdrom_to_hard_disk_stage2(systemtable:Pefi_system_table;efslext:efi_file_system_list_ext;inscd,insdisk:natuint);cdecl;[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK_STAGE2'];
 var fsp1,fsp2:Pefi_simple_file_system_protocol;
-    fp1,fp2:Pefi_file_protocol;
+    fp1,fp2,fp3:Pefi_file_protocol;
     fpinfo:efi_file_info;
     realsize:natuint;
     status:efi_status;
 begin
  fsp1:=(efslext.fsrcontent+inscd-1)^; fsp2:=(efslext.fsrwcontent+insdisk-1)^;
  fsp1^.OpenVolume(fsp1,fp1); fsp2^.OpenVolume(fsp2,fp2);
- status:=fp2^.Open(fp2,fp2,'\',efi_file_mode_create,efi_file_directory);
- if(status=efi_success) then efi_console_output_string(systemtable,'SUCCESS1'#13#10);
- status:=fp2^.Open(fp2,fp2,'\EFI',efi_file_mode_create,efi_file_directory);
- if(status=efi_success) then efi_console_output_string(systemtable,'SUCCESS1'#13#10);
- status:=fp2^.Open(fp2,fp2,'\EFI\BOOT',efi_file_mode_create,efi_file_directory);
- if(status=efi_success) then efi_console_output_string(systemtable,'SUCCESS2'#13#10);
+ status:=fp2^.Open(fp2,fp2,'\',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+ if(status<>efi_success) then 
+  begin
+   efi_console_output_string(systemtable,'ERROR1'#13#10);
+   efi_console_output_string(systemtable,'ERROR CODE:');
+   efi_console_output_string(systemtable,UIntToPWChar(status));
+   efi_console_output_string(systemtable,#13#10);
+  end;
+ status:=fp2^.Open(fp2,fp2,'\EFI',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+ while(status<>efi_success) do
+  begin
+    status:=fp2^.Open(fp2,fp2,'\EFI',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+  end;
+ //status:=fp2^.Open(fp2,fp3,'\EFI',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+ if(status<>efi_success) then 
+  begin
+   efi_console_output_string(systemtable,'ERROR2'#13#10);
+   efi_console_output_string(systemtable,'ERROR CODE:');
+   efi_console_output_string(systemtable,UIntToPWChar(status));
+   efi_console_output_string(systemtable,#13#10);
+  end;
+ status:=fp2^.Open(fp2,fp2,'\EFI\BOOT',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+ if(status<>efi_success) then 
+  begin
+   efi_console_output_string(systemtable,'ERROR3'#13#10);
+   efi_console_output_string(systemtable,'ERROR CODE:');
+   efi_console_output_string(systemtable,UIntToPWChar(status));
+   efi_console_output_string(systemtable,#13#10);
+  end;
  fp1^.Open(fp1,fp1,'\EFI\SETUP\bootx64.efi',efi_file_mode_read,0);
- status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootx64.efi',efi_file_mode_create or efi_file_mode_read or efi_file_mode_write,efi_file_system);
- if(status=efi_success) then efi_console_output_string(systemtable,'SUCCESS3'#13#10);
+ status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootx64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
+ if(status<>efi_success) then 
+  begin
+   efi_console_output_string(systemtable,'ERROR4'#13#10);
+   efi_console_output_string(systemtable,'ERROR CODE:');
+   efi_console_output_string(systemtable,UIntToPWChar(status));
+   efi_console_output_string(systemtable,#13#10);
+  end;
  realsize:=sizeof(efi_file_info);
  fp1^.GetInfo(fp1,@efi_file_info_id,realsize,fpinfo);
  realsize:=fpinfo.FileSize;
  fp1^.efiRead(fp1,realsize,content);
  status:=fp2^.efiWrite(fp2,realsize,@content);
- if(status=efi_success) then efi_console_output_string(systemtable,'SUCCESS4'#13#10);
+ if(status<>efi_success) then 
+  begin
+   efi_console_output_string(systemtable,'ERROR5'#13#10);
+   efi_console_output_string(systemtable,'ERROR CODE:');
+   efi_console_output_string(systemtable,UIntToPWChar(status));
+   efi_console_output_string(systemtable,#13#10);
+  end;
  fp1^.Close(fp1); 
  fp2^.Close(fp2);
 end;
