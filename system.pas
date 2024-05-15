@@ -136,6 +136,8 @@ procedure strinsert(var str:PChar;insertstr:PChar;index:natuint);
 procedure Wstrinsert(var str:PWideChar;insertstr:PWideChar;index:natuint);
 function strpos(str,substr:PChar;start:Natuint):Natuint;
 function Wstrpos(str,substr:PWideChar;start:natuint):natuint;
+function strposinverse(str,substr:PChar;start:Natuint):Natuint;
+function Wstrposinverse(str,substr:PWideChar;start:natuint):natuint;
 function UIntToPChar(UInt:natuint):Pchar;
 function UIntToPWChar(UInt:natuint):PWideChar;
 function PCharToUint(str:PChar):natuint;
@@ -145,6 +147,7 @@ function IntToPWChar(Int:natint):PWideChar;
 function PCharToInt(str:PChar):natint;
 function PWCharToInt(str:PWideChar):natint;
 function DataToHex(Data:Pointer;Size:Natuint):PWideChar;
+function UIntPower(a,b:natuint):natuint;
 var compheap,sysheap:systemheap;
 implementation
 procedure fpc_initialize(Data,Info:Pointer);compilerproc;[public,alias:'FPC_INITIALIZE'];
@@ -566,6 +569,26 @@ begin
   end;
  if(i>mylen) then Wstrpos:=0 else Wstrpos:=i;
 end;
+function strposinverse(str,substr:PChar;start:Natuint):Natuint;[public,alias:'strposinverse'];
+var i,mylen:natuint;
+begin
+ mylen:=strlen(str)-strlen(substr)+1;
+ for i:=mylen downto start do
+  begin
+   if(strcmp(substr,strcopy(str,i,strlen(substr)))=0) then break;
+  end;
+ if(i<start) then strposinverse:=0 else strposinverse:=i;
+end;
+function Wstrposinverse(str,substr:PWideChar;start:natuint):natuint;[public,alias:'Wstrposinverse'];
+var i,mylen:natuint;
+begin
+ mylen:=Wstrlen(str)-Wstrlen(substr)+1;
+ for i:=mylen downto start do
+  begin
+   if(Wstrcmp(substr,Wstrcopy(str,i,Wstrlen(substr)))=0) then break;
+  end;
+ if(i<start) then Wstrposinverse:=0 else Wstrposinverse:=i;
+end;
 function UIntToPChar(UInt:natuint):Pchar;[public,alias:'uinttochar'];
 const numchar:PChar='0123456789';
 var i:byte;
@@ -700,6 +723,7 @@ var i,j:natuint;
     res,start:natint;
     negative:boolean;
 begin
+ res:=0;
  if(str^='-') then 
   begin
    start:=2;
@@ -722,6 +746,7 @@ var i,j:natuint;
     res,start:natint;
     negative:boolean;
 begin
+ res:=0;
  if(str^='-') then 
   begin
    start:=2;
@@ -738,7 +763,7 @@ begin
   end;
  if(negative=true) then PWCharToInt:=-res else PWCharToInt:=res;
 end;
-function DataToHex(Data:Pointer;Size:Natuint):PWideChar;
+function DataToHex(Data:Pointer;Size:Natuint):PWideChar;[public,alias:'DataToHex'];
 const hexcode:PWideChar='0123456789ABCDEF';
 var highbit,lowbit:byte;
     i:natuint;
@@ -753,6 +778,16 @@ begin
    (mystr+i*2-1)^:=(hexcode+lowbit)^;
   end;
  DataToHex:=mystr;
+end;
+function UIntPower(a,b:natuint):natuint;[public,alias:'UintPower'];
+var res,i:natuint;
+begin
+ res:=1;
+ for i:=1 to b do
+  begin
+   res:=res*a;
+  end;
+ UintPower:=res;
 end;
 var i:dword;
 begin
