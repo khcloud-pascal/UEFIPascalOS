@@ -1333,6 +1333,7 @@ const unused_entry_guid:efi_guid=(data1:$00000000;data2:$0000;data3:$0000;data4:
       capsule_flags_initiate_reset:dword=$00030000;
 
 function efi_error(status:efi_status):boolean;cdecl;
+function efi_get_platform:byte;cdecl;
 procedure efi_console_clear_screen(SystemTable:Pefi_system_table);cdecl;
 procedure efi_console_output_string(SystemTable:Pefi_system_table;outputstring:PWideChar);cdecl;
 procedure efi_set_watchdog_timer_to_null(SystemTable:Pefi_system_table);cdecl;
@@ -1383,6 +1384,18 @@ procedure efi_console_clear_screen(SystemTable:Pefi_system_table);cdecl;[public,
 begin
  SystemTable^.ConOut^.ClearScreen(SystemTable^.ConOut);
  currentcolumn:=0; currentrow:=0;
+end;
+function efi_get_platform:byte;cdecl;[public,alias:'EFI_GET_PLATFORM'];
+begin
+ {$IFDEF CPUX86_64}
+ efi_get_platform:=0;
+ {$ENDIF}
+ {$IFDEF CPUAARCH64}
+ efi_get_platform:=1;
+ {$ENDIF}
+ {$IFDEF CPULOONGARCH}
+ efi_get_platform:=2;
+ {$ENDIF}
 end;
 procedure efi_console_output_string(SystemTable:Pefi_system_table;outputstring:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_OUTPUT_STRING'];
 var mychar:array[1..2] of WideChar;
@@ -2017,19 +2030,47 @@ begin
   begin
    status:=fp2^.Open(fp2,fp2,'\EFI\BOOT',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
    while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
-   status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootx64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
-   while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootx64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+   if(efi_get_platform=0) then
+    begin
+     status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootx64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
+     while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootx64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+    end
+   else if(efi_get_platform=1) then
+    begin
+     status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootaarch64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
+     while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootaarch64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+    end
+   else if(efi_get_platform=2) then
+    begin
+     status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootloongarch.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
+     while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootloongarch.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+    end;
    fp2^.SetPosition(fp2,0);
   end
  else 
   begin
    status:=fp2^.Open(fp2,fp2,'\EFI\TYDQOS',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
    while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\TYDQOS',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
-   status:=fp2^.Open(fp2,fp2,'\EFI\TYDQOS\bootx64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
-   while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\TYDQOS\bootx64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
+   if(efi_get_platform=0) then
+    begin
+     status:=fp2^.Open(fp2,fp2,'\EFI\TYDQOS\bootx64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
+     while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootx64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+    end
+   else if(efi_get_platform=1) then
+    begin
+     status:=fp2^.Open(fp2,fp2,'\EFI\TYDQOS\bootaarch64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
+     while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootaarch64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+    end
+   else if(efi_get_platform=2) then
+    begin
+     status:=fp2^.Open(fp2,fp2,'\EFI\TYDQOS\bootloongarch.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
+     while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootloongarch.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+    end;
    fp2^.SetPosition(fp2,0);
   end;
- fp1^.Open(fp1,fp1,'\EFI\SETUP\bootx64.efi',efi_file_mode_read,0);
+ if(efi_get_platform=0) then fp1^.Open(fp1,fp1,'\EFI\SETUP\bootx64.efi',efi_file_mode_read,0)
+ else if(efi_get_platform=1) then fp1^.Open(fp1,fp1,'\EFI\SETUP\bootaarch64.efi',efi_file_mode_read,0)
+ else if(efi_get_platform=2) then fp1^.Open(fp1,fp1,'\EFI\SETUP\bootloongarch.efi',efi_file_mode_read,0);
  realsize:=sizeof(efi_file_info);
  fp1^.GetInfo(fp1,@efi_file_info_id,realsize,fpinfo);
  realsize:=fpinfo.FileSize;

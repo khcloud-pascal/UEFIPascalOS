@@ -4,11 +4,11 @@ unit system;
 {$POINTERMATH ON}
 interface
 {$IFDEF CPU32}
-const maxheap=16777216*4;
-      maxsection=16384*4;
+const maxheap=16777216*8;
+      maxsection=16384*16;
 {$ELSE CPU32}
-const maxheap=67108864*4;
-      maxsection=65536*4;
+const maxheap=67108864*8;
+      maxsection=65536*16;
 {$ENDIF CPU32}
 type
   hresult = LongInt;
@@ -136,6 +136,8 @@ procedure strinsert(var str:PChar;insertstr:PChar;index:natuint);
 procedure Wstrinsert(var str:PWideChar;insertstr:PWideChar;index:natuint);
 function strpos(str,substr:PChar;start:Natuint):Natuint;
 function Wstrpos(str,substr:PWideChar;start:natuint):natuint;
+function strcount(str,substr:PChar;start:Natuint):natuint;
+function Wstrcount(str,substr:PWideChar;start:Natuint):natuint;
 function strposinverse(str,substr:PChar;start:Natuint):Natuint;
 function Wstrposinverse(str,substr:PWideChar;start:natuint):natuint;
 function UIntToPChar(UInt:natuint):Pchar;
@@ -167,7 +169,7 @@ begin
    if(natuint(p)>=compheap.heapsection[i,1]) and (natuint(p)<=compheap.heapsection[i,2]) then break;
   end;
  if(i>compheap.heapcount) then exit;
- len:=compheap.heapsection[i,2]-compheap.heapsection[i,1];
+ len:=compheap.heapsection[i,2]-compheap.heapsection[i,1]+1;
  for j:=i+1 to compheap.heapcount do
   begin
    compheap.heapsection[j-1,1]:=compheap.heapsection[j,1]-len;
@@ -239,7 +241,14 @@ begin
   end;
  len:=NatUint(p)-compheap.heapsection[i,1];
  p1:=@p^; p2:=@newp^; 
- for i:=1 to compheap.heapsection[i,2]-compheap.heapsection[i,1]+1 do p2^:=p1^;
+ if(compheap.heapsection[compheap.heapcount,2]-compheap.heapsection[compheap.heapcount,1]+1>=compheap.heapsection[i,2]-compheap.heapsection[i,1]+1) then
+  begin
+   for i:=1 to compheap.heapsection[i,2]-compheap.heapsection[i,1]+1 do (p2+i-1)^:=(p1+i-1)^;
+  end
+ else 
+  begin
+   for i:=1 to compheap.heapsection[compheap.heapcount,2]-compheap.heapsection[compheap.heapcount,1]+1 do (p2+i-1)^:=(p1+i-1)^;
+  end;
  compheap_delete_item(p); p:=newp+len;
 end;
 procedure sys_move(const source;var dest;count:natuint);compilerproc;[public,alias:'FPC_MOVE'];
@@ -247,9 +256,9 @@ var p1,p2:Pchar;
     i:natuint;
 begin
  p1:=@source; p2:=@dest;
- for i:=1 to count do p2^:=p1^;
+ for i:=1 to count do (p2+i-1)^:=(p1+i-1)^;
 end;
-function fpc_copy_proc(src,dest,typeinfo:Pointer):natint;compilerproc;[public,alias:'fpc_copy_proc'];
+function fpc_copy_proc(src,dest,typeinfo:Pointer):natint;compilerproc;[public,alias:'FPC_COPY_PROC'];
 var address1,address2:Pbyte;
     i:natuint;
 begin
@@ -267,7 +276,7 @@ begin
    if(natuint(p)>=sysheap.heapsection[i,1]) and (natuint(p)<=sysheap.heapsection[i,2]) then break;
   end;
  if(i>sysheap.heapcount) then exit;
- len:=sysheap.heapsection[i,2]- sysheap.heapsection[i,1];
+ len:=sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1;
  for j:=i+1 to sysheap.heapcount do
   begin
     sysheap.heapsection[j-1,1]:= sysheap.heapsection[j,1]-len;
@@ -318,14 +327,23 @@ end;
 procedure reallocmem(var p:Pointer;size:natuint);[public,alias:'reallocmem'];
 var i,len:Natuint;
     newp:Pointer;
+    po1,po2:Pbyte;
 begin
  newp:=getmem(size);
  for i:=1 to sysheap.heapcount do
   begin
    if(NatUint(p)>=sysheap.heapsection[i,1]) and (NatUint(p)<=sysheap.heapsection[i,2]) then break;
   end;
- len:=NatUint(p)-compheap.heapsection[i,1];
- move(p^,newp^,sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1);
+ len:=NatUint(p)-sysheap.heapsection[i,1];
+ po1:=p; po2:=newp;
+ if(sysheap.heapsection[sysheap.heapcount,2]-sysheap.heapsection[sysheap.heapcount,1]+1>=sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1) then
+  begin
+   for i:=1 to sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1 do (po2+i-1)^:=(po1+i-1)^;
+  end
+ else 
+  begin 
+   for i:=1 to sysheap.heapsection[sysheap.heapcount,2]-sysheap.heapsection[sysheap.heapcount,1]+1 do (po2+i-1)^:=(po1+i-1)^;
+  end;
  sysheap_delete_item(p); p:=newp+len;
 end;
 procedure move(const source;var dest;count:natuint);[public,alias:'move'];
@@ -333,36 +351,26 @@ var p1,p2:Pchar;
     i:natuint;
 begin
  p1:=@source; p2:=@dest;
- for i:=1 to count do p2^:=p1^;
+ for i:=1 to count do (p2+i-1)^:=(p1+i-1)^;
 end;
 function strlen(str:Pchar):natuint;[public,alias:'strlen'];
 var res:natuint;
 begin
  res:=0;
- while(str^<>#0) do
-  begin
-   inc(str); inc(res);
-  end;
- dec(str,res);
+ while((str+res)^<>#0) do inc(res);
  strlen:=res;
 end;
-function wstrlen(str:PWideChar):natuint;[public,alias:'wstrlen'];
+function wstrlen(str:PWideChar):natuint;[public,alias:'Wstrlen'];
 var res:natuint;
 begin
  res:=0;
- while(str^<>#0) do
-  begin
-   inc(str); inc(res);
-  end;
- dec(str,res);
+ while((str+res)^<>#0) do inc(res);
  wstrlen:=res;
 end;
 function strcmp(str1,str2:Pchar):natint;[public,alias:'strcmp'];
 var i:natint;
 begin
  i:=0;
- if(strlen(str1)>strlen(str2)) then strcmp:=1
- else if(Strlen(str1)<strlen(str2)) then strcmp:=-1;
  while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
  if((str1+i)^>(str2+i)^) then strcmp:=1
  else if((str1+i)^<(str2+i)^) then strcmp:=-1
@@ -372,8 +380,6 @@ function Wstrcmp(str1,str2:PwideChar):natint;[public,alias:'Wstrcmp'];
 var i:natint;
 begin
  i:=0;
- if(Wstrlen(str1)>Wstrlen(str2)) then Wstrcmp:=1
- else if(WStrlen(str1)<Wstrlen(str2)) then Wstrcmp:=-1;
  while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
  if((str1+i)^>(str2+i)^) then Wstrcmp:=1
  else if((str1+i)^<(str2+i)^) then Wstrcmp:=-1
@@ -393,7 +399,7 @@ begin
  i:=0;
  while((val+i)^<>#0) do
   begin
-   (str+i)^:=(val+i)^;
+   (str+i)^:=(val+i)^; inc(i);
   end;
 end;
 procedure wstrset(var str:PWideChar;val:Pwidechar);[public,alias:'wstrset'];
@@ -402,7 +408,7 @@ begin
  i:=0;
  while((val+i)^<>#0) do
   begin
-   (str+i)^:=(val+i)^;
+   (str+i)^:=(val+i)^; inc(i);
   end;
 end;
 procedure strcat(var dest:PChar;src:PChar);[public,alias:'strcat'];
@@ -413,7 +419,7 @@ begin
   begin
    (dest+len+i-1)^:=(src+i-1)^;
   end;
- (dest+len+i-1)^:=#0;
+ (dest+len+strlen(src))^:=#0;
 end;
 procedure Wstrcat(var dest:PWideChar;src:PWideChar);[public,alias:'Wstrcat'];
 var i,len:natuint;
@@ -423,7 +429,7 @@ begin
   begin
    (dest+len+i-1)^:=(src+i-1)^;
   end;
- (dest+len+i-1)^:=#0;
+ (dest+len+Wstrlen(src))^:=#0;
 end;
 procedure strfree(var str:PChar);[public,alias:'strfree'];
 begin
@@ -437,30 +443,34 @@ function strcopy(str:PChar;index,count:Natuint):Pchar;[public,alias:'strcopy'];
 var newstr:PChar;
     i:natuint;
 begin
+ if(index+count-1>strlen(str)) then exit(nil);
  strinit(newstr,count);
  for i:=1 to count do
   begin
    (newstr+i-1)^:=(str+index-1+i-1)^;
   end;
- (newstr+i-1)^:=#0;
+ (newstr+count)^:=#0;
  strcopy:=newstr;
 end;
 function Wstrcopy(str:PWideChar;index,count:Natuint):PWideChar;[public,alias:'Wstrcopy'];
 var newstr:PWideChar;
     i:natuint;
 begin
+ if(index+count-1>Wstrlen(str)) then exit(nil);
  Wstrinit(newstr,count);
  for i:=1 to count do
   begin
    (newstr+i-1)^:=(str+index-1+i-1)^;
   end;
- (newstr+i-1)^:=#0;
+ (newstr+count)^:=#0;
  Wstrcopy:=newstr;
 end;
 function strcutout(str:PChar;left,right:Natuint):PChar;[public,alias:'strcutout'];
 var newstr:Pchar;
-    i:natuint;
+    i,len:natuint;
 begin
+ len:=strlen(str); 
+ if(left>len) or (right>len) or (left>right) then exit(nil);
  strinit(newstr,right-left+1);
  for i:=left to right do
   begin
@@ -471,8 +481,10 @@ begin
 end;
 function Wstrcutout(str:PWideChar;left,right:Natuint):PWideChar;[public,alias:'Wstrcutout'];
 var newstr:PWidechar;
-    i:natuint;
+    i,len:natuint;
 begin
+ len:=Wstrlen(str); 
+ if(left>len) or (right>len) or (left>right) then exit(nil);
  Wstrinit(newstr,right-left+1);
  for i:=left to right do
   begin
@@ -553,9 +565,12 @@ function strpos(str,substr:PChar;start:Natuint):Natuint;[public,alias:'strpos'];
 var i,mylen:natuint;
 begin
  mylen:=strlen(str)-strlen(substr)+1;
- for i:=start to mylen do
+ if(start>=mylen) then exit(0);
+ i:=start;
+ while(i<=mylen) do
   begin
    if(strcmp(substr,strcopy(str,i,strlen(substr)))=0) then break;
+   inc(i);
   end;
  if(i>mylen) then strpos:=0 else strpos:=i;
 end;
@@ -563,11 +578,74 @@ function Wstrpos(str,substr:PWideChar;start:natuint):natuint;[public,alias:'Wstr
 var i,mylen:natuint;
 begin
  mylen:=Wstrlen(str)-Wstrlen(substr)+1;
- for i:=start to mylen do
+ if(start>mylen) then exit(0);
+ i:=start;
+ while(i<=mylen) do
   begin
    if(Wstrcmp(substr,Wstrcopy(str,i,Wstrlen(substr)))=0) then break;
+   inc(i);
   end;
  if(i>mylen) then Wstrpos:=0 else Wstrpos:=i;
+end;
+function strcount(str,substr:PChar;start:Natuint):natuint;[public,alias:'strcount'];
+var i,len1,len2,res:natuint;
+begin
+ len1:=strlen(str); len2:=strlen(substr);
+ if(len2>len1) then
+  begin
+   res:=0;
+  end
+ else if(len2=len1) then
+  begin
+   if(start>1) then res:=0
+   else 
+    begin
+     if(StrCmp(str,substr)=0) then res:=1 else res:=0;
+    end;
+  end
+ else
+  begin
+   res:=0; i:=start;
+   while(i<len1-len2+1) do
+    begin
+     if(StrCmp(Strcopy(str,i,len2),substr)=0) then 
+      begin
+       inc(i,len2); inc(res);
+      end
+     else inc(i);
+    end;
+  end;
+ strcount:=res;
+end;
+function Wstrcount(str,substr:PWideChar;start:Natuint):natuint;[public,alias:'Wstrcount'];
+var i,len1,len2,res:natuint;
+begin
+ len1:=Wstrlen(str); len2:=Wstrlen(substr);
+ if(len2>len1) then
+  begin
+   res:=0;
+  end
+ else if(len2=len1) then
+  begin
+   if(start>1) then res:=0
+   else 
+    begin
+     if(WStrCmp(str,substr)=0) then res:=1 else res:=0;
+    end;
+  end
+ else
+  begin
+   res:=0; i:=start;
+   while(i<=len1-len2+1) do
+    begin
+     if(WStrCmp(WStrcopy(str,i,len2),substr)=0) then 
+      begin
+       inc(i,len2); inc(res);
+      end
+     else inc(i);
+    end;
+  end;
+ Wstrcount:=res;
 end;
 function strposinverse(str,substr:PChar;start:Natuint):Natuint;[public,alias:'strposinverse'];
 var i,mylen:natuint;

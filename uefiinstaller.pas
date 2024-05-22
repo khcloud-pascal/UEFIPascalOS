@@ -17,7 +17,7 @@ var mystr:PWideChar;
     efslext:efi_file_system_list_ext;
     efp:Pefi_file_protocol;
     efsi:efi_file_system_info;
-    edl,edl2,edl3:efi_disk_list;
+    edl,edl2,edl3,edl4:efi_disk_list;
     mybool:boolean;
 begin
  efi_console_set_global_colour(Systemtable,efi_bck_black,efi_lightgrey);
@@ -86,7 +86,7 @@ begin
    end;
   if(edl.disk_count=0) then
    begin
-    efi_console_output_string(systemtable,'ERROR:No available disk found,installer terminated.'#13#10);
+    efi_console_output_string(systemtable,'Error:No available disk found,installer terminated.'#13#10);
     while(True) do;
    end;
   cdindex:=1; hdindex:=1;
@@ -188,13 +188,27 @@ begin
        efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
        efi_console_read_string(systemtable,mystr);
        emptynum:=PWCharToUint(mystr);
+       while(emptynum>edl2.disk_count) and (emptynum=0) do
+        begin
+         if(emptynum>edl2.disk_count) then
+          begin
+           efi_console_output_string(systemtable,'Error:Total Number is too large that exceed the empty disk total number.');
+          end
+         else if(emptynum=0) then
+          begin
+           efi_console_output_string(systemtable,'Error:Total Number must be larger than 0.');
+          end;
+         efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
+         efi_console_read_string(systemtable,mystr);
+         emptynum:=PWCharToUint(mystr);
+        end;
        if(emptynum<=edl2.disk_count) then
         begin
          i:=0;
          while(i<emptynum) do
           begin
            inc(i);
-           efi_console_output_string(systemtable,'The Empty Disk index');
+           efi_console_output_string(systemtable,'The Empty Disk index ');
            efi_console_output_string(systemtable,UintToPWChar(i));
            efi_console_output_string(systemtable,' is:');
            efi_console_read_String(systemtable,mystr);
@@ -213,7 +227,7 @@ begin
             end
            else
             begin
-             efi_console_output_string(systemtable,'The Disk Name is(Name length DO NOT exceeds to 256):');
+             efi_console_output_string(systemtable,'The Disk Name is(Name length DO NOT exceeds to 255):');
              efi_console_read_string(systemtable,mystr);
              efi_disk_tydq_set_fs(systemtable,emptyindex);
              tydq_fs_initialize(edl2,emptyindex,mystr);
@@ -303,13 +317,27 @@ begin
        efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
        efi_console_read_string(systemtable,mystr);
        emptynum:=PWCharToUint(mystr);
+       while(emptynum>edl2.disk_count) do
+        begin
+         if(emptynum>edl2.disk_count) then
+          begin
+           efi_console_output_string(systemtable,'Error:Total Number is too large that exceed the empty disk total number.');
+          end
+         else if(emptynum=0) then
+          begin
+           efi_console_output_string(systemtable,'Error:Total Number must be larger than 0.');
+          end;
+         efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
+         efi_console_read_string(systemtable,mystr);
+         emptynum:=PWCharToUint(mystr);
+        end;
        if(emptynum<=edl2.disk_count) then
         begin
          i:=0;
          while(i<emptynum) do
           begin
            inc(i);
-           efi_console_output_string(systemtable,'The Empty Disk index');
+           efi_console_output_string(systemtable,'The Empty Disk index ');
            efi_console_output_string(systemtable,UintToPWChar(i));
            efi_console_output_string(systemtable,' is:');
            efi_console_read_String(systemtable,mystr);
@@ -328,8 +356,20 @@ begin
             end
            else
             begin
-             efi_console_output_string(systemtable,'The Disk Name is(Name length DO NOT exceeds to 256):');
+             edl3:=efi_disk_tydq_get_fs_list(systemtable);
+             efi_console_output_string(systemtable,'Type the disk');
+             efi_console_output_string(systemtable,UintToPWChar(i));
+             efi_console_output_string(systemtable,#39's name(Name length DO NOT exceeds to 255):');
              efi_console_read_string(systemtable,mystr);
+             while(Wstrlen(mystr)>255) or (tydq_fs_disk_exists(edl3,mystr)=true) do
+              begin
+               if(Wstrlen(mystr)>255) then efi_console_output_string(systemtable,'Error:Disk name exceeds 255.'#13#10)
+               else if(tydq_fs_disk_exists(edl3,mystr)=true) then efi_console_output_string(systemtable,'Error:Disk name exists.'#13#10);
+               efi_console_output_string(systemtable,'Type the disk');
+               efi_console_output_string(systemtable,UintToPWChar(i));
+               efi_console_output_string(systemtable,#39's name(Name length DO NOT exceeds to 255):');
+               efi_console_read_string(systemtable,mystr);
+              end;
              efi_disk_tydq_set_fs(systemtable,emptyindex);
              tydq_fs_initialize(edl2,emptyindex,mystr);
             end;
