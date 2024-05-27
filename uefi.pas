@@ -1345,6 +1345,9 @@ procedure efi_console_get_cursor_position(SystemTable:Pefi_system_table;var colu
 procedure efi_console_get_max_row_and_max_column(SystemTable:Pefi_system_table;debug:boolean);cdecl;
 procedure efi_console_output_string_with_colour(SystemTable:Pefi_system_table;Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);cdecl;
 procedure efi_console_read_string_with_colour(SystemTable:Pefi_system_table;var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);cdecl;
+function efi_console_edit_text_total_line(outputstr,linefeed:PWideChar;mcolumn:natuint):natuint;cdecl;
+procedure efi_console_edit_text_output_string(SystemTable:Pefi_system_table;Outputstr,filename:PWideChar;startline:natuint;crow,ccolumn:natuint);cdecl;
+procedure efi_console_edit_text_file_content_string(Systemtable:Pefi_system_table;var ReadString:PWideChar;filename:PWideChar);cdecl;
 function efi_console_timer_mouse_blink(Event:efi_event;Context:Pointer):efi_status;cdecl;
 procedure efi_console_enable_mouse_blink(SystemTable:Pefi_system_table;enableblink:boolean;blinkmilliseconds:qword);cdecl;
 function efi_generate_guid(seed1,seed2:qword):efi_guid;cdecl;
@@ -1409,32 +1412,50 @@ begin
     begin
      if((outputstring+i-1)^=#13) and ((outputstring+i)^=#10) then 
       begin
-       mychar[1]:=(outputstring+i-1)^;
-       mychar[2]:=#0;
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
-       mychar[1]:=(outputstring+i)^;
-       mychar[2]:=#0;
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
        inc(currentrow); currentcolumn:=0; inc(i,2);
+      end
+     else if((outputstring+i-1)^=#13) and ((outputstring+i)^<>#10) then
+      begin
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
+       inc(currentrow); currentcolumn:=0; inc(i,1);
+      end
+     else if((outputstring+i-1)^=#10) and ((outputstring+i)^<>#13) then
+      begin
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
+       inc(currentrow); currentcolumn:=0; inc(i,1);
+      end
+     else if((outputstring+i-1)^=#10) or ((outputstring+i-1)^=#13) then
+      begin
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
+       inc(currentrow); currentcolumn:=0; inc(i,1);
       end
      else
       begin
        mychar[1]:=(outputstring+i-1)^;
        mychar[2]:=#0;
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar[1]);
        inc(currentcolumn); inc(i,1);
       end;
     end
    else
     begin
-     mychar[1]:=(outputstring+i-1)^;
-     mychar[2]:=#0;
-     SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
-     inc(currentcolumn); inc(i,1);
+     if((outputstring+i-1)^=#13) or ((outputstring+i-1)^=#10) then
+      begin
+       SystemTable^.ConOut^.OutputString(Systemtable^.ConOut,#13#10);
+       inc(currentrow); inc(i,1);
+      end
+     else
+      begin
+       mychar[1]:=(outputstring+i-1)^;
+       mychar[2]:=#0;
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar[1]);
+       inc(currentcolumn); inc(i,1);
+      end;
     end;
    if(currentcolumn>=maxcolumn) then 
     begin
-     currentcolumn:=0; inc(currentrow,1);
+     currentcolumn:=0; inc(currentrow,1); SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
     end;
    if(currentrow>=maxrow) then 
     begin
@@ -1455,32 +1476,50 @@ begin
     begin
      if((outputstring+i-1)^=#13) and ((outputstring+i)^=#10) then 
       begin
-       mychar[1]:=(outputstring+i-1)^;
-       mychar[2]:=#0;
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
-       mychar[1]:=(outputstring+i)^;
-       mychar[2]:=#0;
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
        inc(currentrow); currentcolumn:=0; inc(i,2);
+      end
+     else if((outputstring+i-1)^=#13) and ((outputstring+i)^<>#10) then
+      begin
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
+       inc(currentrow); currentcolumn:=0; inc(i,1);
+      end
+     else if((outputstring+i-1)^=#10) and ((outputstring+i)^<>#13) then
+      begin
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
+       inc(currentrow); currentcolumn:=0; inc(i,1);
+      end
+     else if((outputstring+i-1)^=#10) or ((outputstring+i-1)^=#13) then
+      begin
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
+       inc(currentrow); currentcolumn:=0; inc(i,1);
       end
      else
       begin
        mychar[1]:=(outputstring+i-1)^;
        mychar[2]:=#0;
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar[1]);
        inc(currentcolumn); inc(i,1);
       end;
     end
    else
     begin
-     mychar[1]:=(outputstring+i-1)^;
-     mychar[2]:=#0;
-     SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
-     inc(currentcolumn); inc(i,1);
+     if((outputstring+i-1)^=#13) or ((outputstring+i-1)^=#10) then
+      begin
+       SystemTable^.ConOut^.OutputString(Systemtable^.ConOut,#13#10);
+       inc(currentrow); inc(i,1);
+      end
+     else
+      begin
+       mychar[1]:=(outputstring+i-1)^;
+       mychar[2]:=#0;
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar[1]);
+       inc(currentcolumn); inc(i,1);
+      end;
     end;
    if(currentcolumn>=maxcolumn) then 
     begin
-     currentcolumn:=0; inc(currentrow,1);
+     currentcolumn:=0; inc(currentrow,1); SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
     end;
    if(currentrow>=maxrow) then 
     begin
@@ -1498,6 +1537,7 @@ var key:efi_input_key;
     waitidx,i,j:natuint;
 begin
  SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,consolebck shl 4+consoletex);
+ if(ReadString<>nil) then freemem(ReadString);
  Readstring:=getmem(sizeof(WideChar)*1025); i:=0;
  while (True) do
   begin
@@ -1505,7 +1545,7 @@ begin
    if(i>1024) then break;
    SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
    SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
-   (ReadString+i-1)^:=key.UnicodeChar;
+   if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
    if((ReadString+i-1)^=#10) or ((ReadString+i-1)^=#13) then
     begin
      (ReadString+i-1)^:=#0; 
@@ -1532,16 +1572,18 @@ begin
         end;
       end;
     end
-   else
+   else if((ReadString+i-1)^<>#0) then
     begin
      inc(currentcolumn);
      if(currentcolumn>=maxcolumn) then
       begin
-       currentcolumn:=0; inc(currentrow);
+       currentcolumn:=0; inc(currentrow); SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
       end;
      if(currentrow>=maxrow) then efi_console_clear_screen(SystemTable);
      SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@(ReadString+i-1)^);
-    end;
+    end
+   else dec(i);
+   efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
   end;
 end;
 procedure efi_console_read_string_with_colour(SystemTable:Pefi_system_table;var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);cdecl;[public,alias:'EFI_CONSOLE_READ_STRING_WITH_COLOUR'];
@@ -1549,6 +1591,7 @@ var key:efi_input_key;
     waitidx,i,j:natuint;
 begin
  SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,backgroundcolour shl 4+textcolour);
+ if(ReadString<>nil) then freemem(ReadString);
  Readstring:=getmem(sizeof(WideChar)*1025); i:=0;
  while (True) do
   begin
@@ -1556,7 +1599,7 @@ begin
    if(i>1024) then break;
    SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
    SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
-   (ReadString+i-1)^:=key.UnicodeChar;
+   if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
    if((ReadString+i-1)^=#10) or ((ReadString+i-1)^=#13) then
     begin
      (ReadString+i-1)^:=#0; 
@@ -1583,15 +1626,408 @@ begin
         end;
       end;
     end
-   else
+   else if((ReadString+i-1)^<>#0) then
     begin
      inc(currentcolumn);
      if(currentcolumn>=maxcolumn) then
       begin
-       currentcolumn:=0; inc(currentrow);
+       currentcolumn:=0; inc(currentrow); SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
       end;
      if(currentrow>=maxrow) then efi_console_clear_screen(SystemTable);
      SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@(ReadString+i-1)^);
+    end
+   else dec(i);
+   efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
+  end;
+end;
+function efi_console_edit_text_total_line(outputstr,linefeed:PWideChar;mcolumn:natuint):natuint;cdecl;[public,alias:'EFI_CONSOLE_EDIT_TEXT_TOTAL_LINE'];
+var pos1,pos2,pos3,mylen1,mylen2,res:natuint;
+begin
+ pos1:=1; pos2:=2; res:=0; mylen1:=Wstrlen(outputstr); mylen2:=Wstrlen(linefeed);
+ while(pos2>0) do
+  begin
+   pos2:=Wstrpos(outputstr,linefeed,pos1);
+   if(pos2=0) then pos3:=mylen1+1 else pos3:=pos2;
+   if(pos3-pos1>mcolumn) then
+    begin
+     res:=res+(pos3-pos1) div mcolumn+1;
+    end
+   else
+    begin
+     res:=res+1;
+    end;
+   if(pos2>0) then pos1:=pos2+mylen2 else break;
+  end;
+ efi_console_edit_text_total_line:=res;
+end;
+procedure efi_console_edit_text_output_string(SystemTable:Pefi_system_table;outputstr,filename:PWideChar;startline:natuint;crow,ccolumn:natuint);cdecl;[public,alias:'EFI_CONSOLE_EDIT_TEXT_OUTPUT_STRING'];
+var i,j,len,pos,lcount,endline,mysize1,mysize2:natuint;
+    lpos1,lpos2:^natuint;
+    partstr,partstr2:PWideChar;
+    mystr:array[1..2] of WideChar;
+begin
+ lcount:=0; lpos1:=allocmem(sizeof(natuint)); lpos2:=allocmem(sizeof(natuint)); i:=1; len:=Wstrlen(outputstr);
+ while(i<=len) do
+  begin
+   pos:=Wstrpos(outputstr,#10,i);
+   if(pos>0) then 
+    begin
+     if(pos-i<=maxcolumn) then
+      begin
+       inc(lcount); 
+       mysize1:=getmemsize(lpos1);
+       lpos2:=lpos2-mysize1 div sizeof(natuint);
+       ReallocMem(lpos1,lcount*sizeof(natuint));
+       mysize2:=getmemsize(lpos2);
+       lpos1:=lpos1-mysize2 div sizeof(natuint);
+       ReallocMem(lpos2,lcount*sizeof(natuint));
+       (lpos1+lcount-1)^:=i; (lpos2+lcount-1)^:=pos-1;
+      end
+     else 
+      begin
+       j:=i;
+       while(j<=pos-maxcolumn) do
+        begin
+         inc(lcount);
+         mysize1:=getmemsize(lpos1);
+         lpos2:=lpos2-mysize1 div sizeof(natuint);
+         ReallocMem(lpos1,lcount*sizeof(natuint));
+         mysize2:=getmemsize(lpos2);
+         lpos1:=lpos1-mysize2 div sizeof(natuint);
+         ReallocMem(lpos2,lcount*sizeof(natuint));
+         (lpos1+lcount-1)^:=j; (lpos2+lcount-1)^:=j+maxcolumn-1;
+         if(j+maxcolumn-1>pos-1) then (lpos2+lcount-1)^:=pos-1;
+         inc(j,maxcolumn); 
+        end;
+      end;
+     i:=pos+1;
+    end
+   else  
+    begin
+     if(len-i+1<=maxcolumn) then
+      begin
+       inc(lcount); 
+       mysize1:=getmemsize(lpos1);
+       lpos2:=lpos2-mysize1 div sizeof(natuint);
+       ReallocMem(lpos1,lcount*sizeof(natuint));
+       mysize2:=getmemsize(lpos2);
+       lpos1:=lpos1-mysize2 div sizeof(natuint);
+       ReallocMem(lpos2,lcount*sizeof(natuint));
+       (lpos1+lcount-1)^:=i; (lpos2+lcount-1)^:=len;
+      end
+     else 
+      begin
+       j:=i;
+       while(j<=len-maxcolumn+1) do
+        begin
+         inc(lcount);
+         mysize1:=getmemsize(lpos1);
+         lpos2:=lpos2-mysize1 div sizeof(natuint);
+         ReallocMem(lpos1,lcount*sizeof(natuint));
+         mysize2:=getmemsize(lpos2);
+         lpos1:=lpos1-mysize2 div sizeof(natuint);
+         ReallocMem(lpos2,lcount*sizeof(natuint));
+         (lpos1+lcount-1)^:=j; (lpos2+lcount-1)^:=j+maxcolumn-1;
+         if(j+maxcolumn-1>len) then (lpos2+lcount-1)^:=len;
+         inc(j,maxcolumn); 
+        end;
+      end;
+     i:=len+1;
+    end;
+  end;
+ SystemTable^.ConOut^.ClearScreen(systemtable^.ConOut);
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,'Editing File Name:');
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,filename);
+ SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,' Total char:');
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UintToPWChar(Wstrlen(Outputstr)));
+ SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,' Line:');
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UintToPWChar(startline));
+ SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,'/');
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UintToPWChar(lcount));
+ SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,' (');
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UIntToPWChar(ccolumn));
+ SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,',');
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UIntToPWChar(crow));
+ SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,')');
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,#13#10);
+ SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,'Please edit the words in file,if you want to exit(will save the file before exit) press esc.'#13#10);
+ if(lcount>startline+maxrow-3) then endline:=startline+maxrow-3 else endline:=lcount;
+ i:=startline;
+ while(i<=endline) do
+  begin
+   partstr:=Wstrcutout(outputstr,(lpos1+i-1)^,(lpos2+i-1)^);
+   SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,partstr);
+   if(i<endline) then SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
+   Wstrfree(partstr);
+   inc(i);
+  end;
+ efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
+ freemem(lpos2); freemem(lpos1);
+end;
+procedure efi_console_edit_text_file_content_string(Systemtable:Pefi_system_table;var ReadString:PWideChar;filename:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_EDIT_TEXT_FILE_CONTENT_STRING'];
+var key:efi_input_key;
+    i,j,waitidx,asrow,ascolumn,acolumn,arow,apos,plen,dlen:natuint;
+    sc:word;
+    inputstr:WideChar;
+    mystr:array[1..2] of WideChar;
+    partstr:PWideChar;
+    pnum1,pnum2,pnum3,pnum4,linenum:natuint;
+    nline:neighborline;
+    totalline:linelist;
+    mcolumn:natuint;
+begin
+ mcolumn:=maxcolumn;
+ SystemTable^.ConOut^.ClearScreen(systemtable^.ConOut);
+ SystemTable^.ConOut^.SetAttribute(systemtable^.ConOut,consolebck shl 4+consoletex);
+ acolumn:=1; arow:=1; apos:=1; asrow:=1; ascolumn:=1;
+ linenum:=efi_console_edit_text_total_line(ReadString,#10,maxcolumn);
+ efi_console_edit_text_output_string(systemtable,ReadString,filename,1,0,0);
+ if(ReadString<>nil) then i:=Wstrlen(ReadString) else 
+  begin
+   i:=0; Wstrinit(ReadString,1);
+  end;
+ currentcolumn:=0; currentrow:=2;
+ efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
+ while (True) do
+  begin
+   linenum:=efi_console_edit_text_total_line(ReadString,#10,maxcolumn);
+   plen:=Wstrlen(ReadString);
+   if(i<plen+1) then
+    begin
+     inc(i);
+     Wstrrealloc(ReadString,i+1);
+    end
+   else if(i>plen+1) then
+    begin
+     dec(i);
+     Wstrrealloc(ReadString,i+1);
+    end;
+   nline:=Neighborlinegenerate(ReadString,#10,asrow,maxcolumn); totalline:=TotalLineList(ReadString,#10,maxcolumn);
+   SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
+   SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
+   inputstr:=key.UnicodeChar; sc:=key.ScanCode;
+   if(sc=1) and (asrow>1) then
+    begin
+     dec(asrow);
+     pnum1:=nline.linepos[1]; pnum2:=nline.lineslen[1];  
+     pnum3:=nline.linepos[2]; pnum4:=nline.lineslen[2]; 
+     dlen:=apos-pnum3;
+     if(pnum2<dlen+1) then apos:=pnum1+pnum2 else if(pnum2>=dlen+1) then apos:=pnum1+dlen;
+     if(pnum2<dlen+1) then ascolumn:=1+pnum2 else if(pnum2>=dlen+1) then ascolumn:=1+dlen;
+    end
+   else if(sc=2) and (asrow<linenum) then
+    begin
+     inc(asrow);
+     if(nline.linelen=2) then
+      begin
+       pnum1:=nline.linepos[1]; pnum2:=nline.lineslen[1]; 
+       pnum3:=nline.linepos[2]; pnum4:=nline.lineslen[2]; 
+       dlen:=apos-pnum1;
+       if(dlen+1<=pnum4) then apos:=pnum3+dlen else if(dlen+1>pnum4) then apos:=pnum3+pnum4;
+       if(dlen+1<=pnum4) then ascolumn:=1+dlen else if(dlen+1>pnum4) then ascolumn:=1+pnum4;
+      end
+     else if(nline.linelen=3) then
+      begin
+       pnum1:=nline.linepos[2]; pnum2:=nline.lineslen[2]; 
+       pnum3:=nline.linepos[3]; pnum4:=nline.lineslen[3]; 
+       if(dlen+1<=pnum4) then apos:=pnum3+dlen else if(dlen+1>pnum4) then apos:=pnum3+pnum4;
+       if(dlen+1<=pnum4) then ascolumn:=1+dlen else if(dlen+1>pnum4) then ascolumn:=1+pnum4;
+      end;
+    end
+   else if(sc=4) and (apos>1) then 
+    begin
+     dec(apos); dec(ascolumn); 
+     if(asrow>1) and (ascolumn=0) then
+      begin
+       dec(asrow); ascolumn:=(totalline.lineright+asrow-1)^-(totalline.lineleft+asrow-1)^+2;
+       if(ascolumn>maxcolumn) then ascolumn:=maxcolumn;
+      end
+     else if(ascolumn=0) then
+      begin
+       ascolumn:=1;
+      end;
+    end
+   else if(sc=3) and (apos<Wstrlen(ReadString)+1) then 
+    begin 
+     inc(apos); inc(ascolumn);
+     dlen:=(totalline.lineright+asrow-1)^-(totalline.lineleft+asrow-1)^+1; if(dlen<maxcolumn) then dlen:=dlen+1;
+     if(asrow<totalline.linecount) and (ascolumn>dlen) then
+      begin
+       inc(asrow); ascolumn:=1;
+      end
+     else if(apos=Wstrlen(ReadString)+1) then
+      begin
+       ascolumn:=dlen;
+      end;
+    end
+   else if(sc=9) and (asrow>maxrow-2) then
+    begin
+     pnum1:=(totalline.lineleft+asrow-maxrow+2)^; pnum2:=(totalline.lineright+asrow-maxrow+2)^-(totalline.lineleft+asrow-maxrow+2)^+1;
+     pnum3:=(totalline.lineleft+asrow-1)^; pnum4:=(totalline.lineright+asrow-1)^-(totalline.lineleft+asrow-1)^+1;
+     dlen:=apos-pnum3;
+     if(pnum2<dlen+1) then apos:=pnum1+pnum2 else if(pnum2>=dlen+1) then apos:=pnum1+dlen;
+     if(pnum2<dlen+1) then ascolumn:=1+pnum2 else if(pnum2>=dlen+1) then ascolumn:=1+dlen;
+     dec(asrow,23);
+    end
+   else if(sc=10) and (linenum>maxrow-2) and (asrow<linenum-maxrow+2) then
+    begin
+     pnum1:=(totalline.lineleft+asrow-1)^; pnum2:=(totalline.lineright+asrow-1)^-(totalline.lineleft+asrow-1)^+1;
+     pnum3:=(totalline.lineleft+asrow+maxrow-3)^; pnum4:=(totalline.lineright+asrow+maxrow-3)^-(totalline.lineleft+asrow+maxrow-3)^+1;
+     dlen:=apos-pnum1;
+     if(dlen+1<pnum4) then apos:=pnum3+dlen else if(dlen+1>=pnum4) then apos:=pnum3+pnum4;
+     if(dlen+1<pnum4) then ascolumn:=dlen+1 else if(dlen+1>=pnum4) then ascolumn:=1+pnum4;
+     inc(asrow,23);
+    end
+   else if(sc=23) then 
+    begin
+     efi_console_clear_screen(systemtable); break;
+    end
+   else if(sc=8) then
+    begin
+     Wstrfree(readstring); Wstrinit(readstring,1);
+    end
+   else if(inputstr<>#0) then
+    begin
+     if(inputstr=#10) or (inputstr=#13) then
+      begin
+       Wstrinsert(ReadString,#10,apos); 
+       inc(apos); inc(asrow); ascolumn:=1;
+      end
+     else if(inputstr=#8) then
+      begin
+       Wstrdelete(ReadString,apos,1);
+       totalline:=TotalLineList(ReadString,#10,maxcolumn);
+       if(asrow>1) and (ascolumn=1) and (apos>1) then
+        begin
+         dec(asrow); dec(apos);
+         dlen:=(totalline.lineright+asrow-1)^-(totalline.lineleft+asrow-1)^+1;
+         ascolumn:=(totalline.lineright+asrow-1)^-(totalline.lineleft+asrow-1)^+2; 
+         if(dlen<maxcolumn) then ascolumn:=dlen else ascolumn:=maxcolumn;
+        end
+       else if(ascolumn>1) and (apos>1) then
+        begin
+         dec(ascolumn); dec(apos);
+        end
+       else if(apos>1) then
+        begin
+         dec(apos);
+        end;
+      end
+     else 
+      begin
+       mystr[1]:=inputstr; mystr[2]:=#0;
+       Wstrinsert(ReadString,@mystr,apos);
+       totalline:=TotalLineList(ReadString,#10,maxcolumn);
+       inc(ascolumn); inc(apos);
+       dlen:=(totalline.lineright+asrow-1)^-(totalline.lineleft+asrow-1)^+2;
+       if(dlen>=maxcolumn-1) then dlen:=maxcolumn-1; 
+       if(asrow<linenum) and (ascolumn>dlen+1) then 
+        begin
+         inc(asrow); ascolumn:=1;
+        end
+       else if(dlen<maxcolumn) and (ascolumn>dlen+1) then 
+        begin
+         ascolumn:=dlen+1;
+        end
+       else if(ascolumn>dlen) then
+        begin
+         ascolumn:=dlen;
+        end;
+      end; 
+    end;
+   pnum1:=Wstrposdir(ReadString,#10,apos-1,-1);
+   if(pnum1=0) then acolumn:=apos else acolumn:=apos-pnum1; if(acolumn=0) then acolumn:=1;
+   partstr:=Wstrcutout(ReadString,1,apos-1); arow:=Wstrcount(partstr,#10,1)+1; Wstrfree(partstr);
+   if(asrow>(maxrow-2) div 2) and (asrow<linenum-(maxrow-2) div 2) then 
+   efi_console_edit_text_output_string(systemtable,ReadString,filename,asrow,arow,acolumn)
+   else if(asrow<=(maxrow-2) div 2) then 
+   efi_console_edit_text_output_string(systemtable,ReadString,filename,1,arow,acolumn)
+   else if(asrow>=linenum-(maxrow-2) div 2) then 
+   efi_console_edit_text_output_string(systemtable,ReadString,filename,linenum-(maxrow-2) div 2,arow,acolumn);
+   currentcolumn:=ascolumn-1; 
+   if(asrow>(maxrow-2) div 2) and (asrow<linenum-(maxrow-2) div 2) then currentrow:=2+(maxrow-2) div 2
+   else if(asrow<=(maxrow-2) div 2) then currentrow:=1+asrow
+   else if(asrow>=linenum-(maxrow-2) div 2) then currentrow:=2+asrow-(linenum-(maxrow-2) div 2)-1;
+   efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
+  end;
+end;
+procedure efi_console_edit_hex_output_string(systemtable:Pefi_system_table;ReadData:PByte;ReadLength:natuint;filename:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_EDIT_HEX_OUTPUT_STRING'];
+begin
+end;
+procedure efi_console_edit_hex_content_string(systemtable:Pefi_system_table;var ReadData:PByte;var ReadLength:natuint;filename:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_EDIT_HEX_CONTENT_STRING'];
+var key:efi_input_key;
+    i,waitidx,maxbyte:natuint;
+    sc:word;
+    inputch:WideChar;
+    inputstr:PWideChar;
+    apos1,apos2:natuint;
+begin
+ maxbyte:=maxcolumn div 3;
+ SystemTable^.ConOut^.ClearScreen(SystemTable^.ConOut);
+ SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,consolebck shr 4+consoletex);
+ apos1:=1; apos2:=1; currentcolumn:=0; currentrow:=2;
+ efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
+ if(ReadData=nil) or (ReadLength=0) then
+  begin
+   ReadData:=allocmem(sizeof(byte)); i:=1; Readlength:=0;
+  end
+ else i:=ReadLength;
+ while (True) do
+  begin
+   if(i<ReadLength+1) then
+    begin
+     inc(i);
+     ReallocMem(ReadData,sizeof(byte)*(i+1));
+    end
+   else if(i>ReadLength+1) then
+    begin
+     dec(i);
+     ReallocMem(ReadData,sizeof(Byte)*(i+1));
+    end;
+   SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
+   SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
+   inputch:=key.UnicodeChar; sc:=key.ScanCode;
+   if(sc=2) and (apos1<(ReadLength+1) div maxbyte*maxbyte) then
+    begin
+     if(apos1>=ReadLength div maxbyte*maxbyte-maxbyte+1) and (apos1<=ReadLength div maxbyte*maxbyte) then inc(apos1,ReadLength mod maxbyte)
+     else inc(apos1,maxbyte);
+    end
+   else if(sc=1) and (apos1>maxbyte) then
+    begin
+     dec(apos1,maxbyte);
+    end
+   else if(sc=4) then
+    begin
+     if(apos2=2) and (apos1<ReadLength) then
+      begin
+       apos2:=1; inc(apos1);
+      end
+     else if(apos2=1) then inc(apos2);
+    end
+   else if(sc=3) then
+    begin
+     if(apos2=1) and (apos1>1) then
+      begin
+       apos2:=2; dec(apos1);
+      end
+     else if(apos2=2) then dec(apos2);
+    end
+   else if(sc=9) then
+    begin
+    end
+   else if(sc=10) then
+    begin
+    end
+   else if(sc=23) then
+    begin
+     efi_console_clear_screen(systemtable); break;
+    end
+   else if(sc=8) then
+    begin
+     FreeMem(ReadData); ReadLength:=1; ReadData:=allocmem(sizeof(byte));
+    end
+   else if(inputch<>#0) then
+    begin
     end;
   end;
 end;
@@ -1599,7 +2035,7 @@ procedure efi_console_enable_mouse(SystemTable:Pefi_system_table);cdecl;[public,
 begin
  SystemTable^.ConOut^.EnableCursor(SystemTable^.ConOut,true);
 end;
-procedure efi_console_set_global_colour(SystemTable:Pefi_system_table;backgroundcolour:byte;textcolour:byte);cdecl;[public,alias:'EFI_CONSOLE_SET_GLOAL_COLOUR'];
+procedure efi_console_set_global_colour(SystemTable:Pefi_system_table;backgroundcolour:byte;textcolour:byte);cdecl;[public,alias:'EFI_CONSOLE_SET_GLOBAL_COLOUR'];
 begin
  consolebck:=backgroundcolour; consoletex:=textcolour;
 end;
@@ -2037,7 +2473,7 @@ begin
     end
    else if(efi_get_platform=1) then
     begin
-     status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootaarch64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
+     status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootaa64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
      while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootaarch64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
     end
    else if(efi_get_platform=2) then
@@ -2058,8 +2494,8 @@ begin
     end
    else if(efi_get_platform=1) then
     begin
-     status:=fp2^.Open(fp2,fp2,'\EFI\TYDQOS\bootaarch64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
-     while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootaarch64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
+     status:=fp2^.Open(fp2,fp2,'\EFI\TYDQOS\bootaa64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_system);
+     while(status<>efi_success) do status:=fp2^.Open(fp2,fp2,'\EFI\BOOT\bootaa64.efi',efi_file_mode_create or efi_file_mode_write or efi_file_mode_read,efi_file_directory);
     end
    else if(efi_get_platform=2) then
     begin
@@ -2069,7 +2505,7 @@ begin
    fp2^.SetPosition(fp2,0);
   end;
  if(efi_get_platform=0) then fp1^.Open(fp1,fp1,'\EFI\SETUP\bootx64.efi',efi_file_mode_read,0)
- else if(efi_get_platform=1) then fp1^.Open(fp1,fp1,'\EFI\SETUP\bootaarch64.efi',efi_file_mode_read,0)
+ else if(efi_get_platform=1) then fp1^.Open(fp1,fp1,'\EFI\SETUP\bootaa64.efi',efi_file_mode_read,0)
  else if(efi_get_platform=2) then fp1^.Open(fp1,fp1,'\EFI\SETUP\bootloongarch.efi',efi_file_mode_read,0);
  realsize:=sizeof(efi_file_info);
  fp1^.GetInfo(fp1,@efi_file_info_id,realsize,fpinfo);

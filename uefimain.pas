@@ -1,4 +1,5 @@
 unit uefimain;
+
 interface
 
 uses uefi,tydqfs;
@@ -109,23 +110,15 @@ begin
  efi_console_output_string(systemtable,#13#10);
  if(mybool=true) then efi_console_output_string(systemtable,'TRUE'#13#10)
  else if(mybool=false) then efi_console_output_string(systemtable,'FALSE'#13#10);
- Wstrinit(writestr,256);
- Wstrset(writestr,'Hello UEFI!');
- efi_console_output_string(systemtable,writestr);
- efi_console_output_string(systemtable,#13#10);
+ Wstrinit(writestr,1024*128);
+ Wstrset(writestr,'Hello UEFI!'#10'Hello UEFI!'#10'Hello UEFI!');
+ efi_console_edit_text_file_content_string(systemtable,writestr,'/System/Password.dqi');
  tydq_fs_file_rewrite(systemtable,edl,1,'/System/Password.dqi',0,writestr,(Wstrlen(writestr)+1)*sizeof(WideChar),userlevel_system);
  tfsd:=tydq_fs_file_read(edl,1,'/System/Password.dqi',0,(Wstrlen(writestr)+1)*sizeof(WideChar),userlevel_system);
- for i:=1 to tfsd.fssize do
-  begin
-   efi_console_output_string(systemtable,UintToPWchar((tfsd.fsdata+i-1)^));
-  end;
- efi_console_output_string(systemtable,#13#10);
- efi_console_output_string(systemtable,UintToPWChar(tfsd.fssize));
- efi_console_output_string(systemtable,#13#10);
  efi_console_output_string(systemtable,PWideChar(tfsd.fsdata));
  efi_console_output_string(systemtable,#13#10);
- Wstrfree(writestr);
  freemem(edl.disk_content); freemem(edl.disk_block_content); edl.disk_count:=0;
+ Wstrfree(writestr);
  efi_console_output_string(systemtable,'Program Terminated......'#13#10);
  while(True) do;
  efi_main:=efi_success;

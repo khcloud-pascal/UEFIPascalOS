@@ -12,6 +12,7 @@ const maxheap=67108864*8;
 {$ENDIF CPU32}
 type
   hresult = LongInt;
+  Char = #0..#255;
   DWord = LongWord;
   Cardinal = LongWord;
   Integer = SmallInt;
@@ -99,9 +100,21 @@ type
 	   heapsection:array[1..maxsection,1..2] of natuint;
 	   heapcount,heaprest:natuint;
            end;
+  neighborline=record
+               lineslen:array[1..3] of natuint;
+               linepos:array[1..3] of natuint;
+               linelen:byte;
+               linestatus:byte;
+               end;
+  linelist=record
+           lineleft:^natuint;
+           lineright:^natuint;
+           linecount:natuint;
+           end;
 procedure fpc_initialize(data,info:Pointer);compilerproc;
 procedure fpc_finalize(data,Info:Pointer);compilerproc;       
 procedure fpc_specific_handler;compilerproc;
+procedure fpc_handleerror;compilerproc;
 function sys_getmem(size:natuint):Pointer;compilerproc;
 procedure sys_freemem(var p:pointer);compilerproc;
 function sys_allocmem(size:natuint):Pointer;compilerproc;
@@ -110,12 +123,15 @@ procedure sys_move(const source;var dest;count:natuint);compilerproc;
 function getmem(size:natuint):Pointer;
 procedure freemem(var p:pointer);
 function allocmem(size:natuint):Pointer;
+function getmemsize(p:Pointer):natuint;
 procedure reallocmem(var p:Pointer;size:natuint);
 procedure move(const source;var dest;count:natuint);
 function strlen(str:Pchar):natuint;
 function wstrlen(str:PWideChar):natuint;
 procedure strinit(var str:PChar;size:natuint);
 procedure wstrinit(var str:PWideChar;Size:natuint);
+procedure strrealloc(var str:PChar;size:natuint);
+procedure Wstrrealloc(var str:PwideChar;size:natuint);
 procedure strset(var str:PChar;val:Pchar);
 procedure wstrset(var str:PWideChar;val:Pwidechar);
 function strcmp(str1,str2:Pchar):natint;
@@ -136,6 +152,12 @@ procedure strinsert(var str:PChar;insertstr:PChar;index:natuint);
 procedure Wstrinsert(var str:PWideChar;insertstr:PWideChar;index:natuint);
 function strpos(str,substr:PChar;start:Natuint):Natuint;
 function Wstrpos(str,substr:PWideChar;start:natuint):natuint;
+function strposdir(str,substr:PChar;start:natuint;direction:shortint):natuint;
+function Wstrposdir(str,substr:PWideChar;start:natuint;direction:shortint):natuint;
+function strposorder(str,substr:PChar;start,order:natuint):natuint;
+function Wstrposorder(str,substr:PWideChar;start,order:natuint):natuint;
+function strposdirorder(str,substr:PChar;start,order:natuint;direction:shortint):natuint;
+function Wstrposdirorder(str,substr:PWideChar;start,order:natuint;direction:shortint):natuint;
 function strcount(str,substr:PChar;start:Natuint):natuint;
 function Wstrcount(str,substr:PWideChar;start:Natuint):natuint;
 function strposinverse(str,substr:PChar;start:Natuint):Natuint;
@@ -150,6 +172,13 @@ function PCharToInt(str:PChar):natint;
 function PWCharToInt(str:PWideChar):natint;
 function DataToHex(Data:Pointer;Size:Natuint):PWideChar;
 function UIntPower(a,b:natuint):natuint;
+function UintToHex(inputint:natuint):Pchar;
+function UintToWhex(inputint:natuint):PWideChar;
+function HexToUint(inputhex:PChar):natuint;
+function WHexToUint(inputhex:PWideChar):natuint;
+function Neighborlinegenerate(originalstr,linestr:PWideChar;row:natuint;mcolumn:natuint):neighborline;
+function TotalLineList(originalstr,linefeed:PWideChar;mcolumn:natuint):linelist;
+
 var compheap,sysheap:systemheap;
 implementation
 procedure fpc_initialize(Data,Info:Pointer);compilerproc;[public,alias:'FPC_INITIALIZE'];
@@ -161,17 +190,27 @@ end;
 procedure fpc_specific_handler;compilerproc;[public,alias:'__FPC_specific_handler'];
 begin
 end;
-procedure compheap_delete_item(p:pointer);
-var i,j,len:natuint;
+procedure fpc_handleerror;compilerproc;[public,alias:'FPC_HANDLEERROR'];
 begin
- for i:=1 to compheap.heapcount do
+end;
+procedure compheap_delete_item(p:pointer);
+var i,j,k,len:natuint;
+begin
+ i:=1;
+ while(i<=compheap.heapcount) do
   begin
    if(natuint(p)>=compheap.heapsection[i,1]) and (natuint(p)<=compheap.heapsection[i,2]) then break;
+   inc(i);
   end;
  if(i>compheap.heapcount) then exit;
  len:=compheap.heapsection[i,2]-compheap.heapsection[i,1]+1;
  for j:=i+1 to compheap.heapcount do
   begin
+   for k:=compheap.heapsection[j,1] to compheap.heapsection[j,2] do
+    begin
+     compheap.heapcontent[k-len-Qword(@compheap.heapcontent)+1]:=compheap.heapcontent[k-Qword(@compheap.heapcontent)+1];
+     compheap.heapcontent[k-Qword(@compheap.heapcontent)+1]:=0;
+    end;
    compheap.heapsection[j-1,1]:=compheap.heapsection[j,1]-len;
    compheap.heapsection[j-1,2]:=compheap.heapsection[j,2]-len;
   end;
@@ -180,18 +219,19 @@ begin
  dec(compheap.heapcount); inc(compheap.heaprest,len);
 end;
 function sys_getmem(size:natuint):Pointer;compilerproc;[public,alias:'FPC_GETMEM'];
-var i,istart:natuint;
+var i,istart,cstart:natuint;
 begin
  if(compheap.heapcount>=maxsection) then sys_getmem:=nil;
  if(compheap.heaprest<size) then sys_getmem:=nil;
  if(size=0) then sys_getmem:=nil;
  if(compheap.heapcount>0) then istart:=compheap.heapsection[compheap.heapcount,2]+1 else istart:=Natuint(@compheap.heapcontent);
+ cstart:=istart-Natuint(@compheap.heapcontent)+1;
  inc(compheap.heapcount);
  compheap.heapsection[compheap.heapcount,1]:=istart;
  compheap.heapsection[compheap.heapcount,2]:=istart+size-1;
  for i:=1 to size do
   begin
-   compheap.heapcontent[istart+i-1]:=0;
+   compheap.heapcontent[cstart+i-1]:=0;
   end;
  dec(compheap.heaprest,size);
  sys_getmem:=Pointer(compheap.heapsection[compheap.heapcount,1]);
@@ -201,55 +241,60 @@ begin
  compheap_delete_item(p); p:=nil;
 end;
 function sys_allocmem(size:natuint):Pointer;compilerproc;[public,alias:'FPC_ALLOCMEM'];
-var i,istart:natuint;
+var i,istart,cstart:natuint;
 begin
  if(compheap.heapcount>=maxsection) then sys_allocmem:=nil;
  if(compheap.heaprest<size) then sys_allocmem:=nil;
  if(size=0) then sys_allocmem:=nil;
  if(compheap.heapcount>0) then istart:=compheap.heapsection[compheap.heapcount,2]+1 else istart:=NatUint(@compheap.heapcontent);
+ cstart:=istart-Natuint(@compheap.heapcontent)+1;
  inc(compheap.heapcount);
  compheap.heapsection[compheap.heapcount,1]:=istart;
  compheap.heapsection[compheap.heapcount,2]:=istart+size-1;
  for i:=1 to size do
   begin
-   compheap.heapcontent[istart+i-1]:=0;
+   compheap.heapcontent[cstart+i-1]:=0;
   end;
  dec(compheap.heaprest,size);
  sys_allocmem:=Pointer(compheap.heapsection[compheap.heapcount,1]);
 end;
 procedure sys_reallocmem(var p:Pointer;size:natuint);compilerproc;[public,alias:'FPC_REALLOCMEM'];
-var i,istart,len:Natuint;
+var i,istart,cstart,len,orgsize:Natuint;
     newp:Pointer;
-    p1,p2:Pchar;
+    p1,p2:Pbyte;
 begin
  if(compheap.heapcount>=maxsection) then exit;
  if(compheap.heaprest<size) then exit;
  if(size=0) then exit;
  if(compheap.heapcount>0) then istart:=compheap.heapsection[compheap.heapcount,2]+1 else istart:=Natuint(@compheap.heapcontent);
+ cstart:=istart-Natuint(@compheap.heapcontent)+1;
  inc(compheap.heapcount);
  compheap.heapsection[compheap.heapcount,1]:=istart;
  compheap.heapsection[compheap.heapcount,2]:=istart+size-1;
  for i:=1 to size do
   begin
-   compheap.heapcontent[istart+i-1]:=0;
+   compheap.heapcontent[cstart+i-1]:=0;
   end;
  dec(compheap.heaprest,size);
  newp:=Pointer(compheap.heapsection[compheap.heapcount,1]);
- for i:=1 to compheap.heapcount do
+ i:=1;
+ while(i<=compheap.heapcount)do
   begin
    if(NatUint(p)>=compheap.heapsection[i,1]) and (NatUint(p)<=compheap.heapsection[i,2]) then break;
   end;
- len:=NatUint(p)-compheap.heapsection[i,1];
- p1:=@p^; p2:=@newp^; 
- if(compheap.heapsection[compheap.heapcount,2]-compheap.heapsection[compheap.heapcount,1]+1>=compheap.heapsection[i,2]-compheap.heapsection[i,1]+1) then
+ if(i>compheap.heapcount) then exit;
+ len:=NatUint(p)-compheap.heapsection[i,1]; 
+ orgsize:=compheap.heapsection[i,2]-compheap.heapsection[i,1]+1;
+ p1:=Pbyte(compheap.heapsection[i,1]); p2:=@newp^; 
+ if(compheap.heapsection[compheap.heapcount,2]-compheap.heapsection[compheap.heapcount,1]+1>=orgsize) then
   begin
-   for i:=1 to compheap.heapsection[i,2]-compheap.heapsection[i,1]+1 do (p2+i-1)^:=(p1+i-1)^;
+   for i:=1 to orgsize do (p2+i-1)^:=(p1+i-1)^;
   end
  else 
   begin
    for i:=1 to compheap.heapsection[compheap.heapcount,2]-compheap.heapsection[compheap.heapcount,1]+1 do (p2+i-1)^:=(p1+i-1)^;
   end;
- compheap_delete_item(p); p:=newp+len;
+ p:=newp+len;
 end;
 procedure sys_move(const source;var dest;count:natuint);compilerproc;[public,alias:'FPC_MOVE'];
 var p1,p2:Pchar;
@@ -258,47 +303,45 @@ begin
  p1:=@source; p2:=@dest;
  for i:=1 to count do (p2+i-1)^:=(p1+i-1)^;
 end;
-function fpc_copy_proc(src,dest,typeinfo:Pointer):natint;compilerproc;[public,alias:'FPC_COPY_PROC'];
-var address1,address2:Pbyte;
-    i:natuint;
-begin
- address1:=src; address2:=dest;
- for i:=1 to sizeof(src^) do
-  begin
-   (address2+i-1)^:=(address1+i-1)^;
-  end; 
-end;
 procedure sysheap_delete_item(p:pointer);
-var i,j,len:natuint;
+var i,j,k,len:natuint;
 begin
- for i:=1 to sysheap.heapcount do
+ i:=1;
+ while(i<=sysheap.heapcount) do
   begin
    if(natuint(p)>=sysheap.heapsection[i,1]) and (natuint(p)<=sysheap.heapsection[i,2]) then break;
+   inc(i);
   end;
  if(i>sysheap.heapcount) then exit;
  len:=sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1;
  for j:=i+1 to sysheap.heapcount do
   begin
-    sysheap.heapsection[j-1,1]:= sysheap.heapsection[j,1]-len;
-    sysheap.heapsection[j-1,2]:= sysheap.heapsection[j,2]-len;
+   for k:=sysheap.heapsection[j,1] to sysheap.heapsection[j,2] do
+    begin
+     sysheap.heapcontent[k-len-Qword(@sysheap.heapcontent)+1]:=sysheap.heapcontent[k-Qword(@sysheap.heapcontent)+1];
+     sysheap.heapcontent[k-Qword(@sysheap.heapcontent)+1]:=0;
+    end;
+   sysheap.heapsection[j-1,1]:=sysheap.heapsection[j,1]-len;
+   sysheap.heapsection[j-1,2]:=sysheap.heapsection[j,2]-len;
   end;
-  sysheap.heapsection[sysheap.heapcount,1]:=0;
-  sysheap.heapsection[sysheap.heapcount,2]:=0; 
+ sysheap.heapsection[sysheap.heapcount,1]:=0;
+ sysheap.heapsection[sysheap.heapcount,2]:=0; 
  dec(sysheap.heapcount); inc(sysheap.heaprest,len);
 end;
 function getmem(size:natuint):Pointer;[public,alias:'getmem'];
-var i,istart:natuint;
+var i,istart,cstart:natuint;
 begin
  if(sysheap.heapcount>=maxsection) then getmem:=nil;
  if(sysheap.heaprest<size) then getmem:=nil;
  if(size=0) then getmem:=nil;
  if(sysheap.heapcount>0) then istart:=sysheap.heapsection[sysheap.heapcount,2]+1 else istart:=Natuint(@sysheap.heapcontent);
+ cstart:=istart-Natuint(@sysheap.heapcontent)+1;
  inc(sysheap.heapcount);
  sysheap.heapsection[sysheap.heapcount,1]:=istart;
  sysheap.heapsection[sysheap.heapcount,2]:=istart+size-1;
  for i:=1 to size do
   begin
-   sysheap.heapcontent[istart+i-1]:=0;
+   sysheap.heapcontent[cstart+i-1]:=0;
   end;
  dec(sysheap.heaprest,size);
  getmem:=Pointer(sysheap.heapsection[sysheap.heapcount,1]);
@@ -308,43 +351,60 @@ begin
  sysheap_delete_item(p); p:=nil;
 end;
 function allocmem(size:natuint):Pointer;[public,alias:'allocmem'];
-var i,istart:natuint;
+var i,istart,cstart:natuint;
 begin
  if(sysheap.heapcount>=maxsection) then allocmem:=nil;
  if(sysheap.heaprest<size) then allocmem:=nil;
  if(size=0) then allocmem:=nil;
  if(sysheap.heapcount>0) then istart:=sysheap.heapsection[sysheap.heapcount,2]+1 else istart:=NatUint(@sysheap.heapcontent);
+ cstart:=istart-Natuint(@sysheap.heapcontent)+1;
  inc(sysheap.heapcount);
  sysheap.heapsection[sysheap.heapcount,1]:=istart;
  sysheap.heapsection[sysheap.heapcount,2]:=istart+size-1;
  for i:=1 to size do
   begin
-   sysheap.heapcontent[istart+i-1]:=0;
+   sysheap.heapcontent[cstart+i-1]:=0;
   end;
  dec(sysheap.heaprest,size);
  allocmem:=Pointer(sysheap.heapsection[sysheap.heapcount,1]);
 end;
+function getmemsize(p:Pointer):natuint;[public,alias:'getmemsize'];
+var i:natuint;
+begin
+ i:=1;
+ while(i<=sysheap.heapcount) do
+  begin
+   if(NatUint(p)>=sysheap.heapsection[i,1]) and (NatUint(p)<=sysheap.heapsection[i,2]) then break;
+   inc(i);
+  end;
+ if(i>sysheap.heapcount) then exit(0);
+ getmemsize:=sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1;
+end;
 procedure reallocmem(var p:Pointer;size:natuint);[public,alias:'reallocmem'];
-var i,len:Natuint;
+var i,len,orgsize:Natuint;
     newp:Pointer;
     po1,po2:Pbyte;
 begin
  newp:=getmem(size);
- for i:=1 to sysheap.heapcount do
+ i:=1;
+ while(i<=sysheap.heapcount) do
   begin
    if(NatUint(p)>=sysheap.heapsection[i,1]) and (NatUint(p)<=sysheap.heapsection[i,2]) then break;
+   inc(i);
   end;
+ if(i>sysheap.heapcount) then exit;
  len:=NatUint(p)-sysheap.heapsection[i,1];
- po1:=p; po2:=newp;
- if(sysheap.heapsection[sysheap.heapcount,2]-sysheap.heapsection[sysheap.heapcount,1]+1>=sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1) then
+ orgsize:=sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1;
+ po1:=Pbyte(sysheap.heapsection[i,1]); po2:=newp;
+ if(sysheap.heapsection[sysheap.heapcount,2]-sysheap.heapsection[sysheap.heapcount,1]+1>=orgsize) then
   begin
-   for i:=1 to sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1 do (po2+i-1)^:=(po1+i-1)^;
+   for i:=1 to orgsize do (po2+i-1)^:=(po1+i-1)^;
   end
  else 
-  begin 
+  begin
    for i:=1 to sysheap.heapsection[sysheap.heapcount,2]-sysheap.heapsection[sysheap.heapcount,1]+1 do (po2+i-1)^:=(po1+i-1)^;
   end;
- sysheap_delete_item(p); p:=newp+len;
+ sysheap_delete_item(p); p:=newp+len-orgsize;
 end;
 procedure move(const source;var dest;count:natuint);[public,alias:'move'];
 var p1,p2:Pchar;
@@ -357,6 +417,7 @@ function strlen(str:Pchar):natuint;[public,alias:'strlen'];
 var res:natuint;
 begin
  res:=0;
+ if(str=nil) then exit(0);
  while((str+res)^<>#0) do inc(res);
  strlen:=res;
 end;
@@ -364,6 +425,7 @@ function wstrlen(str:PWideChar):natuint;[public,alias:'Wstrlen'];
 var res:natuint;
 begin
  res:=0;
+ if(str=nil) then exit(0);
  while((str+res)^<>#0) do inc(res);
  wstrlen:=res;
 end;
@@ -393,6 +455,16 @@ procedure wstrinit(var str:PWideChar;Size:natuint);[public,alias:'wstrinit'];
 begin
  str:=allocmem(sizeof(WideChar)*(size+1));
 end;
+procedure strrealloc(var str:PChar;size:natuint);[public,alias:'strrealloc'];
+begin
+ ReallocMem(str,sizeof(char)*(size+1));
+ (str+size)^:=#0;
+end;
+procedure Wstrrealloc(var str:PwideChar;size:natuint);[public,alias:'Wstrrealloc'];
+begin
+ ReallocMem(str,sizeof(WideChar)*(size+1));
+ (str+size)^:=#0;
+end;
 procedure strset(var str:PChar;val:Pchar);[public,alias:'strset'];
 var i:natuint;
 begin
@@ -401,6 +473,7 @@ begin
   begin
    (str+i)^:=(val+i)^; inc(i);
   end;
+ (str+i)^:=#0;
 end;
 procedure wstrset(var str:PWideChar;val:Pwidechar);[public,alias:'wstrset'];
 var i:natuint;
@@ -410,6 +483,7 @@ begin
   begin
    (str+i)^:=(val+i)^; inc(i);
   end;
+ (str+i)^:=#0;
 end;
 procedure strcat(var dest:PChar;src:PChar);[public,alias:'strcat'];
 var i,len:natuint;
@@ -494,44 +568,48 @@ begin
  Wstrcutout:=newstr;
 end;
 procedure strdelete(var str:PChar;index,count:Natuint);[public,alias:'strdelete'];
-var i:natuint;
+var i,len:natuint;
 begin
- for i:=1 to count do
+ len:=strlen(str);
+ for i:=index+count to len do
   begin
-   (str+index-1+i-1)^:=(str+index-1+count+i-1)^;
-   (str+index-1+count+i-1)^:=#0;
+   (str+i-1-count)^:=(str+i-1)^;
+   (str+i-1)^:=#0;
   end;
- (str+index+i-1)^:=#0;
+ (str+len-count)^:=#0;
 end;
 procedure Wstrdelete(var str:PWideChar;index,count:Natuint);[public,alias:'Wstrdelete'];
-var i:natuint;
+var i,len:natuint;
 begin
- for i:=1 to count do
+ len:=Wstrlen(str);
+ for i:=index+count to len do
   begin
-   (str+index-1+i-1)^:=(str+index-1+count+i-1)^;
-   (str+index-1+count+i-1)^:=#0;
+   (str+i-1-count)^:=(str+i-1)^;
+   (str+i-1)^:=#0;
   end;
- (str+index-1+i-1)^:=#0;
+ (str+len-count)^:=#0;
 end;
 procedure strdeleteinrange(var str:PChar;left,right:Natuint);[public,alias:'strdeleteinrange'];
-var i:natuint;
+var i,len,distance:natuint;
 begin
- for i:=left to right do
+ len:=strlen(str); distance:=right-left+1;
+ for i:=right+1 to len do
   begin
-   (str+i-1)^:=(str+i-1+right-left+1)^;
-   (str+i-1+right-left+1)^:=#0;
+   (str+i-1-distance)^:=(str+i-1)^;
+   (str+i-1)^:=#0;
   end;
- (str+i-1)^:=#0;
+ (str+len-distance)^:=#0;
 end;
 procedure WStrdeleteinrange(var str:PWideChar;left,right:Natuint);[public,alias:'Wstrdeleteinrange'];
-var i:natuint;
+var i,len,distance:natuint;
 begin
- for i:=left to right do
+ len:=Wstrlen(str); distance:=right-left+1;
+ for i:=right+1 to len do
   begin
-   (str+i-1)^:=(str+i-1+right-left+1)^;
-   (str+i-1+right-left+1)^:=#0;
+   (str+i-1-distance)^:=(str+i-1)^;
+   (str+i-1)^:=#0;
   end;
- (str+i-1)^:=#0;
+ (str+len-distance)^:=#0;
 end;
 procedure strinsert(var str:PChar;insertstr:PChar;index:natuint);[public,alias:'strinsert'];
 var strlength,partlength,i:natuint;
@@ -546,6 +624,7 @@ begin
   begin
    (str+index-1+i-1)^:=(insertstr+i-1)^;
   end;
+ (str+strlength+partlength)^:=#0;
 end;
 procedure Wstrinsert(var str:PWideChar;insertstr:PWideChar;index:natuint);[public,alias:'Wstrinsert'];
 var strlength,partlength,i:natuint;
@@ -560,6 +639,7 @@ begin
   begin
    (str+index-1+i-1)^:=(insertstr+i-1)^;
   end;
+ (str+strlength+partlength)^:=#0;
 end;
 function strpos(str,substr:PChar;start:Natuint):Natuint;[public,alias:'strpos'];
 var i,mylen:natuint;
@@ -587,11 +667,176 @@ begin
   end;
  if(i>mylen) then Wstrpos:=0 else Wstrpos:=i;
 end;
+function strposdir(str,substr:PChar;start:natuint;direction:shortint):natuint;[public,alias:'strposdir'];
+var i,mylen:natuint;
+begin
+ mylen:=strlen(str)-strlen(substr)+1;
+ if(start>mylen) and (direction=1) then exit(0);
+ if(start<1) and (direction=-1) then exit(0);
+ if(direction=1) then
+  begin
+   i:=start;
+   while(i<=mylen) do 
+    begin
+     if(strcmp(substr,strcopy(str,i,strlen(substr)))=0) then break;
+     inc(i);
+    end;
+   if(i>mylen) then strposdir:=0 else strposdir:=i;
+  end
+ else if(direction=-1) then
+  begin
+   i:=start;
+   while(i>=1) do
+    begin
+     if(strcmp(substr,strcopy(str,i,strlen(substr)))=0) then break;
+     dec(i);
+    end;
+   if(i=0) then strposdir:=0 else strposdir:=i;
+  end
+ else if(direction=0) then strposdir:=0;
+end;
+function Wstrposdir(str,substr:PWideChar;start:natuint;direction:shortint):natuint;[public,alias:'Wstrposdir'];
+var i,mylen:natuint;
+begin
+ mylen:=Wstrlen(str)-Wstrlen(substr)+1;
+ if(start>mylen) and (direction=1) then exit(0);
+ if(start<1) and (direction=-1) then exit(0);
+ if(direction=1) then
+  begin
+   i:=start;
+   while(i<=mylen) do 
+    begin
+     if(Wstrcmp(substr,Wstrcopy(str,i,Wstrlen(substr)))=0) then break;
+     inc(i);
+    end;
+   if(i>mylen) then Wstrposdir:=0 else Wstrposdir:=i;
+  end
+ else if(direction=-1) then
+  begin
+   i:=start;
+   while(i>=1) do
+    begin
+     if(Wstrcmp(substr,Wstrcopy(str,i,Wstrlen(substr)))=0) then break;
+     dec(i);
+    end;
+   if(i=0) then Wstrposdir:=0 else Wstrposdir:=i;
+  end
+ else if(direction=0) then Wstrposdir:=0;
+end;
+function strposorder(str,substr:PChar;start,order:natuint):natuint;[public,alias:'strposorder'];
+var i,forder,mylen:natuint;
+begin
+ mylen:=strlen(str)-strlen(substr)+1;
+ if(start>mylen) then exit(0);
+ if(order=0) then exit(0);
+ i:=start; forder:=0;
+ while(i<=mylen) do
+  begin 
+   if(strcmp(substr,strcopy(str,i,strlen(substr)))=0) then
+    begin
+     inc(forder);
+     if(forder>=order) then break else inc(i,strlen(substr));
+    end
+   else inc(i);
+  end;
+ if(i>mylen) then strposorder:=0 else strposorder:=i;
+end;
+function Wstrposorder(str,substr:PWideChar;start,order:natuint):natuint;[public,alias:'Wstrposorder'];
+var i,forder,mylen:natuint;
+begin
+ mylen:=Wstrlen(str)-Wstrlen(substr)+1;
+ if(start>mylen) then exit(0);
+ if(order=0) then exit(0);
+ i:=start; forder:=0;
+ while(i<=mylen) do
+  begin 
+   if(Wstrcmp(substr,Wstrcopy(str,i,Wstrlen(substr)))=0) then
+    begin
+     inc(forder);
+     if(forder>=order) then break else inc(i,Wstrlen(substr));
+    end
+   else inc(i);
+  end;
+ if(i>mylen) then Wstrposorder:=0 else Wstrposorder:=i;
+end;
+function strposdirorder(str,substr:PChar;start,order:natuint;direction:shortint):natuint;[public,alias:'strposdirorder'];
+var i,forder,mylen:natuint;
+begin
+ mylen:=strlen(str)-strlen(substr)+1;
+ if(start>mylen) and (direction=1) then exit(0);
+ if(start<1) and (direction=-1) then exit(0);
+ if(direction=0) then exit(0);
+ if(order=0) then exit(0);
+ i:=start; forder:=0;
+ if(direction=1) then
+  begin
+   while(i<=mylen) do
+    begin
+     if(strcmp(substr,strcopy(str,i,strlen(substr)))=0) then
+      begin
+       inc(forder);
+       if(forder>=order) then break else inc(i,strlen(substr));
+      end
+     else inc(i);
+    end;
+   if(i>mylen) then strposdirorder:=0 else strposdirorder:=i;
+  end
+ else if(direction=-1) then
+  begin
+   while(i>=1) do
+    begin
+     if(strcmp(substr,strcopy(str,i,strlen(substr)))=0) then
+      begin
+       inc(forder);
+       if(forder>=order) then break else dec(i,strlen(substr));
+      end
+     else dec(i);
+    end;
+   if(i=0) then strposdirorder:=0 else strposdirorder:=i;
+  end;
+end;
+function Wstrposdirorder(str,substr:PWideChar;start,order:natuint;direction:shortint):natuint;[public,alias:'Wstrposdirorder'];
+var i,forder,mylen:natuint;
+begin
+ mylen:=Wstrlen(str)-Wstrlen(substr)+1;
+ if(start>mylen) and (direction=1) then exit(0);
+ if(start<1) and (direction=-1) then exit(0);
+ if(direction=0) then exit(0);
+ if(order=0) then exit(0);
+ i:=start; forder:=0;
+ if(direction=1) then
+  begin
+   while(i<=mylen) do
+    begin
+     if(Wstrcmp(substr,Wstrcopy(str,i,Wstrlen(substr)))=0) then
+      begin
+       inc(forder);
+       if(forder>=order) then break else inc(i,Wstrlen(substr));
+      end
+     else inc(i);
+    end;
+   if(i>mylen) then Wstrposdirorder:=0 else Wstrposdirorder:=i;
+  end
+ else if(direction=-1) then
+  begin
+   while(i>=1) do
+    begin
+     if(Wstrcmp(substr,Wstrcopy(str,i,Wstrlen(substr)))=0) then
+      begin
+       inc(forder);
+       if(forder>=order) then break else dec(i,Wstrlen(substr));
+      end
+     else dec(i);
+    end;
+   if(i=0) then Wstrposdirorder:=0 else Wstrposdirorder:=i;
+  end;
+end;
 function strcount(str,substr:PChar;start:Natuint):natuint;[public,alias:'strcount'];
 var i,len1,len2,res:natuint;
 begin
  len1:=strlen(str); len2:=strlen(substr);
- if(len2>len1) then
+ if(len1=0) or (len2=0) then res:=0
+ else if(len2>len1) then
   begin
    res:=0;
   end
@@ -621,7 +866,8 @@ function Wstrcount(str,substr:PWideChar;start:Natuint):natuint;[public,alias:'Ws
 var i,len1,len2,res:natuint;
 begin
  len1:=Wstrlen(str); len2:=Wstrlen(substr);
- if(len2>len1) then
+ if(len1=0) or (len2=0) then res:=0
+ else if(len2>len1) then
   begin
    res:=0;
   end
@@ -650,20 +896,22 @@ end;
 function strposinverse(str,substr:PChar;start:Natuint):Natuint;[public,alias:'strposinverse'];
 var i,mylen:natuint;
 begin
- mylen:=strlen(str)-strlen(substr)+1;
- for i:=mylen downto start do
+ mylen:=strlen(str)-strlen(substr)+1; i:=mylen;
+ while(i>=start) do
   begin
    if(strcmp(substr,strcopy(str,i,strlen(substr)))=0) then break;
+   dec(i);
   end;
  if(i<start) then strposinverse:=0 else strposinverse:=i;
 end;
 function Wstrposinverse(str,substr:PWideChar;start:natuint):natuint;[public,alias:'Wstrposinverse'];
 var i,mylen:natuint;
 begin
- mylen:=Wstrlen(str)-Wstrlen(substr)+1;
- for i:=mylen downto start do
+ mylen:=Wstrlen(str)-Wstrlen(substr)+1; i:=mylen;
+ while(i>=start) do
   begin
    if(Wstrcmp(substr,Wstrcopy(str,i,Wstrlen(substr)))=0) then break;
+   dec(i);
   end;
  if(i<start) then Wstrposinverse:=0 else Wstrposinverse:=i;
 end;
@@ -867,7 +1115,186 @@ begin
   end;
  UintPower:=res;
 end;
-var i:dword;
+function UintToHex(inputint:natuint):Pchar;[public,alias:'UintToHex'];
+const hexcode:PChar='0123456789ABCDEF';
+var i,j,k,procint:natuint;
+    str:PChar;
+begin
+ i:=0; procint:=inputint;
+ while(inputint div UintPower(16,i)>=16) do inc(i);
+ strinit(str,i+1);
+ for j:=i+1 downto 1 do
+  begin 
+   (str+j-1)^:=(hexcode+procint mod 16)^;
+   procint:=procint div 16;
+  end;
+ (str+i+1)^:=#0;
+ UintToHex:=str;
+end;
+function UintToWhex(inputint:natuint):PWideChar;[public,alias:'UintToWHex'];
+const hexcode:PWideChar='0123456789ABCDEF';
+var i,j,k,procint:natuint;
+    str:PWideChar;
+begin
+ i:=0; procint:=inputint;
+ while(inputint div UintPower(16,i)>=16) do inc(i);
+ Wstrinit(str,i+1);
+ for j:=i+1 downto 1 do
+  begin 
+   (str+j-1)^:=(hexcode+procint mod 16)^;
+   procint:=procint div 16;
+  end;
+ (str+i+1)^:=#0;
+ UintToWHex:=str;
+end;
+function HexToUint(inputhex:PChar):natuint;[public,alias:'HexToUint'];
+const hexcode1:PChar='0123456789ABCDEF';
+      hexcode2:PChar='0123456789abcdef';
+var res,i,j:natuint;
+begin
+ i:=1; res:=0;
+ while((inputhex+i-1)^<>#0) do
+  begin
+   j:=0;
+   while(j<=15) and ((inputhex+i-1)^<>(hexcode1+j)^) and ((inputhex+i-1)^<>(hexcode2+j)^) do inc(j);
+   res:=res*16+j;
+  end;
+ HexToUint:=res;
+end;
+function WHexToUint(inputhex:PWideChar):natuint;[public,alias:'WHexToUint'];
+const hexcode1:PWideChar='0123456789ABCDEF';
+      hexcode2:PWideChar='0123456789abcdef';
+var res,i,j:natuint;
+begin
+ i:=1; res:=0;
+ while((inputhex+i-1)^<>#0) do
+  begin
+   j:=0;
+   while(j<=15) and ((inputhex+i-1)^<>(hexcode1+j)^) and ((inputhex+i-1)^<>(hexcode2+j)^) do inc(j);
+   res:=res*16+j;
+  end;
+ WHexToUint:=res;
+end;
+function Neighborlinegenerate(originalstr,linestr:PWideChar;row:natuint;mcolumn:natuint):neighborline;[public,alias:'Neighborlinegenerate'];
+var res:neighborline;
+    mypos,mylen:^natuint;
+    mycount,istart,iend,i,j:natuint;
+    pos1,pos2,pos3,mylen1,mylen2,mysize1,mysize2:natuint;
+begin
+ mylen1:=Wstrlen(originalstr); mylen2:=Wstrlen(linestr);
+ if(mylen1=0) or (mylen2=0) then pos2:=0 else pos2:=1; pos1:=1;
+ if(pos2=0) then exit;
+ mypos:=allocmem(sizeof(natuint)); mylen:=allocmem(sizeof(natuint)); mycount:=0;
+ while(pos2>0) do
+  begin
+   pos2:=Wstrpos(originalstr,linestr,pos1);
+   if(pos2=0) then pos3:=mylen1+1 else pos3:=pos2;
+   if(pos3-pos1>mcolumn) then
+    begin
+     j:=pos1;
+     while(j<pos3) do
+      begin
+       inc(mycount);
+       mysize1:=getmemsize(mypos);
+       mylen:=mylen-mysize1 div sizeof(natuint);
+       ReallocMem(mypos,sizeof(natuint)*mycount); 
+       mysize2:=getmemsize(mylen);
+       mypos:=mypos-mysize2 div sizeof(natuint);
+       ReallocMem(mylen,sizeof(natuint)*mycount);
+       (mypos+mycount-1)^:=j; (mypos+mycount-1)^:=j+mcolumn-1;
+       if(j+mcolumn-1>=pos3-1) then (mypos+mycount-1)^:=pos3-1;
+       inc(j,mcolumn);
+      end;
+    end
+   else 
+    begin
+     inc(mycount);
+     mysize1:=getmemsize(mypos);
+     mylen:=mylen-mysize1 div sizeof(natuint);
+     ReallocMem(mypos,sizeof(natuint)*mycount); 
+     mysize2:=getmemsize(mylen);
+     mypos:=mypos-mysize2 div sizeof(natuint);
+     ReallocMem(mylen,sizeof(natuint)*mycount);
+     (mypos+mycount-1)^:=pos1; (mylen+mycount-1)^:=pos3-pos1;
+    end;
+   if(pos2>0) then pos1:=pos2+mylen2 else break;
+  end;
+ if(row=1) then
+  begin
+   istart:=1; 
+   if(mycount>2) then iend:=2 else iend:=mycount;
+   res.linestatus:=0;
+  end
+ else if(row=mycount) then
+  begin
+   if(mycount>2) then istart:=mycount-1 else istart:=1; 
+   iend:=mycount;
+   res.linestatus:=1;
+  end
+ else
+  begin
+   istart:=row-1;
+   iend:=row+1;
+   res.linestatus:=2;
+  end;
+ res.linelen:=iend-istart+1;
+ for i:=istart to iend do
+  begin
+   j:=i-istart+1;
+   res.lineslen[j]:=(mylen+i-1)^;
+   res.linepos[j]:=(mypos+i-1)^;
+  end;
+ freemem(mylen); freemem(mypos); 
+ Neighborlinegenerate:=res;
+end;
+function TotalLineList(originalstr,linefeed:PWideChar;mcolumn:natuint):linelist;[public,alias:'TotalLineList'];
+var pos1,pos2,pos3,mylen1,mylen2,i,mysize:natuint;
+    res:linelist;
+begin
+ pos1:=1; pos2:=2; pos3:=pos2; res.linecount:=0; res.lineleft:=allocmem(sizeof(natuint)); res.lineright:=allocmem(sizeof(natuint));
+ mylen1:=Wstrlen(originalstr); mylen2:=Wstrlen(linefeed);
+ while(pos2>0) do
+  begin
+   pos2:=Wstrpos(originalstr,linefeed,pos1);
+   if(pos2=0) then pos3:=mylen1+1 else pos3:=pos2;
+   if(pos3-pos1>mcolumn) then
+    begin
+     i:=pos1;
+     while(i<pos3) do
+      begin
+       inc(res.linecount);
+       mysize:=getmemsize(res.lineleft);
+       res.lineright:=res.lineright-mysize div sizeof(natuint);
+       ReallocMem(res.lineleft,res.linecount*sizeof(natuint)); 
+       mysize:=getmemsize(res.lineright);
+       res.lineleft:=res.lineleft-mysize div sizeof(natuint);
+       ReallocMem(res.lineright,res.linecount*sizeof(natuint));
+       if(i+mcolumn-1<pos3) then
+        begin
+         (res.lineleft+res.linecount-1)^:=i; (res.lineright+res.linecount-1)^:=i+mcolumn-1;
+        end
+       else 
+        begin
+         (res.lineleft+res.linecount-1)^:=i; (res.lineright+res.linecount-1)^:=pos3-1;
+        end;
+       inc(i,mcolumn);
+      end;
+    end
+   else 
+    begin
+     inc(res.linecount);
+     mysize:=getmemsize(res.lineleft);
+     res.lineright:=res.lineright-mysize div sizeof(natuint);
+     ReallocMem(res.lineleft,res.linecount*sizeof(natuint)); 
+     mysize:=getmemsize(res.lineright);
+     res.lineleft:=res.lineleft-mysize div sizeof(natuint);
+     ReallocMem(res.lineright,res.linecount*sizeof(natuint));
+     (res.lineleft+res.linecount-1)^:=pos1; (res.lineright+res.linecount-1)^:=pos3-1;
+    end;
+   if(pos2>0) then pos1:=pos2+mylen2 else break;
+  end;
+ TotalLineList:=res;
+end;
 begin
  compheap.heapcount:=0; compheap.heaprest:=maxheap;
  sysheap.heapcount:=0; sysheap.heaprest:=maxheap;

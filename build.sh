@@ -1,5 +1,6 @@
-	fpc -XPx86_64-w64-mingw32- -Aas -n -O4 -Si -Sc -Sg -Xd -CX -XXs -Px86_64 -Rintel -Twin64 -Cg uefiinstaller.pas
-	fpc -XPx86_64-w64-mingw32- -Aas -n -O4 -Si -Sc -Sg -Xd -CX -XXs -Px86_64 -Rintel -Twin64 -Cg uefimain.pas
+	/home/tydq/source/compiler/ppc1 -XPx86_64-w64-mingw32- -Aas -n -O1 -Si -Sc -Sg -Xd -Us -CX -XXs -Px86_64 -Rintel -Twin64 -Cg system.pas
+	/home/tydq/source/compiler/ppc1 -XPx86_64-w64-mingw32- -Aas -n -O1 -Si -Sc -Sg -Xd -CX -XXs -Px86_64 -Rintel -Twin64 -Cg uefiinstaller.pas
+	/home/tydq/source/compiler/ppc1 -XPx86_64-w64-mingw32- -Aas -n -O1 -Si -Sc -Sg -Xd -CX -XXs -Px86_64 -Rintel -Twin64 -Cg uefimain.pas
 	mkdir installer
 	x86_64-w64-mingw32-ld --gc-sections -shared -Bsymbolic --no-keep-memory -nostdlib -oformat=pei-x86-64 uefiinstaller.o uefi.o tydqfs.o system.o -e efi_main -o installer.dll
 	objcopy -I pei-x86-64 -O efi-app-x86_64 installer.dll installer/bootx64.efi
