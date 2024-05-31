@@ -1348,6 +1348,8 @@ procedure efi_console_read_string_with_colour(SystemTable:Pefi_system_table;var 
 function efi_console_edit_text_total_line(outputstr,linefeed:PWideChar;mcolumn:natuint):natuint;cdecl;
 procedure efi_console_edit_text_output_string(SystemTable:Pefi_system_table;Outputstr,filename:PWideChar;startline:natuint;crow,ccolumn:natuint);cdecl;
 procedure efi_console_edit_text_file_content_string(Systemtable:Pefi_system_table;var ReadString:PWideChar;filename:PWideChar);cdecl;
+procedure efi_console_edit_hex_output_string(systemtable:Pefi_system_table;ReadData:PByte;ReadLength:natuint;filename:PWideChar;startline:natuint;ccolumn,crow:natuint);cdecl;
+procedure efi_console_edit_hex_content_string(systemtable:Pefi_system_table;var ReadData:PByte;var ReadLength:natuint;filename:PWideChar);cdecl;
 function efi_console_timer_mouse_blink(Event:efi_event;Context:Pointer):efi_status;cdecl;
 procedure efi_console_enable_mouse_blink(SystemTable:Pefi_system_table;enableblink:boolean;blinkmilliseconds:qword);cdecl;
 function efi_generate_guid(seed1,seed2:qword):efi_guid;cdecl;
@@ -1741,15 +1743,22 @@ begin
  SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,' Total char:');
  SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UintToPWChar(Wstrlen(Outputstr)));
  SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,' Line:');
- SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UintToPWChar(startline));
+ partstr:=UintToPWChar(startline);
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,partstr);
+ Wstrfree(partstr);
  SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,'/');
- SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UintToPWChar(lcount));
+ partstr:=UintToPWChar(lcount);
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,partstr);
+ Wstrfree(partstr);
  SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,' (');
- SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UIntToPWChar(ccolumn));
+ partstr:=UintToPWChar(ccolumn);
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,partstr);
+ Wstrfree(partstr);
  SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,',');
- SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UIntToPWChar(crow));
- SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,')');
- SystemTable^.ConOut^.OutputString(systemtable^.ConOut,#13#10);
+ partstr:=UintToPWChar(crow);
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,partstr);
+ Wstrfree(partstr);
+ SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,')'#13#10);
  SystemTable^.ConOut^.Outputstring(systemtable^.ConOut,'Please edit the words in file,if you want to exit(will save the file before exit) press esc.'#13#10);
  if(lcount>startline+maxrow-3) then endline:=startline+maxrow-3 else endline:=lcount;
  i:=startline;
@@ -1867,7 +1876,7 @@ begin
      dlen:=apos-pnum3;
      if(pnum2<dlen+1) then apos:=pnum1+pnum2 else if(pnum2>=dlen+1) then apos:=pnum1+dlen;
      if(pnum2<dlen+1) then ascolumn:=1+pnum2 else if(pnum2>=dlen+1) then ascolumn:=1+dlen;
-     dec(asrow,23);
+     dec(asrow,maxrow-2);
     end
    else if(sc=10) and (linenum>maxrow-2) and (asrow<linenum-maxrow+2) then
     begin
@@ -1876,7 +1885,7 @@ begin
      dlen:=apos-pnum1;
      if(dlen+1<pnum4) then apos:=pnum3+dlen else if(dlen+1>=pnum4) then apos:=pnum3+pnum4;
      if(dlen+1<pnum4) then ascolumn:=dlen+1 else if(dlen+1>=pnum4) then ascolumn:=1+pnum4;
-     inc(asrow,23);
+     inc(asrow,maxrow-2);
     end
    else if(sc=23) then 
     begin
@@ -1900,8 +1909,7 @@ begin
        if(asrow>1) and (ascolumn=1) and (apos>1) then
         begin
          dec(asrow); dec(apos);
-         dlen:=(totalline.lineright+asrow-1)^-(totalline.lineleft+asrow-1)^+1;
-         ascolumn:=(totalline.lineright+asrow-1)^-(totalline.lineleft+asrow-1)^+2; 
+         dlen:=(totalline.lineright+asrow-1)^-(totalline.lineleft+asrow-1)^+2;
          if(dlen<maxcolumn) then ascolumn:=dlen else ascolumn:=maxcolumn;
         end
        else if(ascolumn>1) and (apos>1) then
@@ -1939,7 +1947,7 @@ begin
    if(pnum1=0) then acolumn:=apos else acolumn:=apos-pnum1; if(acolumn=0) then acolumn:=1;
    partstr:=Wstrcutout(ReadString,1,apos-1); arow:=Wstrcount(partstr,#10,1)+1; Wstrfree(partstr);
    if(asrow>(maxrow-2) div 2) and (asrow<linenum-(maxrow-2) div 2) then 
-   efi_console_edit_text_output_string(systemtable,ReadString,filename,asrow,arow,acolumn)
+   efi_console_edit_text_output_string(systemtable,ReadString,filename,asrow-(maxrow-2) div 2,arow,acolumn)
    else if(asrow<=(maxrow-2) div 2) then 
    efi_console_edit_text_output_string(systemtable,ReadString,filename,1,arow,acolumn)
    else if(asrow>=linenum-(maxrow-2) div 2) then 
@@ -1947,25 +1955,77 @@ begin
    currentcolumn:=ascolumn-1; 
    if(asrow>(maxrow-2) div 2) and (asrow<linenum-(maxrow-2) div 2) then currentrow:=2+(maxrow-2) div 2
    else if(asrow<=(maxrow-2) div 2) then currentrow:=1+asrow
-   else if(asrow>=linenum-(maxrow-2) div 2) then currentrow:=2+asrow-(linenum-(maxrow-2) div 2)-1;
+   else if(asrow>=linenum-(maxrow-2) div 2) then currentrow:=2+asrow-(linenum-(maxrow-2) div 2);
    efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
   end;
 end;
-procedure efi_console_edit_hex_output_string(systemtable:Pefi_system_table;ReadData:PByte;ReadLength:natuint;filename:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_EDIT_HEX_OUTPUT_STRING'];
+procedure efi_console_edit_hex_output_string(systemtable:Pefi_system_table;ReadData:PByte;ReadLength:natuint;filename:PWideChar;startline:natuint;ccolumn,crow:natuint);cdecl;[public,alias:'EFI_CONSOLE_EDIT_HEX_OUTPUT_STRING'];
+var startpos,endpos,i,len:natuint;
+    partstr:PwideChar;
 begin
+ SystemTable^.ConOut^.ClearScreen(SystemTable^.ConOut);
+ SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,'Editing File Name:');
+ SystemTable^.ConOut^.Outputstring(SystemTable^.ConOut,filename);
+ SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,' Total Bytes:');
+ partstr:=UintTOPWchar(ReadLength);
+ SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,partstr);
+ Wstrfree(partstr);
+ SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,' Lines:');
+ partstr:=UintToPWchar(crow);
+ SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,UintToPWChar(crow));
+ Wstrfree(partstr);
+ SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,'/');
+ partstr:=UintToPWChar(ReadLength div (maxcolumn div 3)+1);
+ SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,partstr);
+ Wstrfree(partstr);
+ SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,' (');
+ partstr:=UintToPWChar(ccolumn);
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,partstr);
+ Wstrfree(partstr);
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,',');
+ partstr:=UintToPWChar(crow);
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,UintTOPWChar(crow));
+ Wstrfree(partstr);
+ SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,')'#13#10);
+ SystemTable^.ConOut^.OutputString(systemtable^.ConOut,'Please edit hex in file.You can press esc(will auto save the file) to exit the edit.'#13#10);
+ startpos:=(startline-1)*(maxcolumn div 3)+1;
+ if(startpos+(maxrow-2)*(maxcolumn div 3)-1>ReadLength) then endpos:=ReadLength else endpos:=startpos+(maxrow-2)*(maxcolumn div 3)-1;
+ i:=startpos;
+ while(i<=endpos) do
+  begin
+   partstr:=UintToWhex((ReadData+i-1)^); len:=Wstrlen(partstr);
+   if(len=1) then
+    begin
+     SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,'0');
+     SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,partstr);
+     SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,' ');
+    end
+   else if(len=2) then
+    begin
+     SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,partstr);
+     SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,' ');
+    end;
+   Wstrfree(partstr);
+   inc(i);
+   if(i mod (maxcolumn div 3)=1) and (i<=endpos) then SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
+  end;
 end;
 procedure efi_console_edit_hex_content_string(systemtable:Pefi_system_table;var ReadData:PByte;var ReadLength:natuint;filename:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_EDIT_HEX_CONTENT_STRING'];
+const hexc1:PWideChar='0123456789ABCDEF';
+      hexc2:PWideChar='0123456789abcdef';
 var key:efi_input_key;
-    i,waitidx,maxbyte:natuint;
+    i,j,waitidx,maxbyte,maxpagebyte,procnum,arow,acolumn:natuint;
+    lefthex,righthex:byte;
     sc:word;
     inputch:WideChar;
     inputstr:PWideChar;
     apos1,apos2:natuint;
 begin
- maxbyte:=maxcolumn div 3;
+ maxbyte:=maxcolumn div 3; maxpagebyte:=maxbyte*(maxrow-2);
  SystemTable^.ConOut^.ClearScreen(SystemTable^.ConOut);
  SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,consolebck shr 4+consoletex);
- apos1:=1; apos2:=1; currentcolumn:=0; currentrow:=2;
+ apos1:=1; apos2:=1; currentcolumn:=0; currentrow:=2; acolumn:=1; arow:=1;
+ efi_console_edit_hex_output_string(systemtable,ReadData,ReadLength,filename,1,acolumn,arow);
  efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
  if(ReadData=nil) or (ReadLength=0) then
   begin
@@ -1977,34 +2037,35 @@ begin
    if(i<ReadLength+1) then
     begin
      inc(i);
-     ReallocMem(ReadData,sizeof(byte)*(i+1));
-    end
+     ReallocMem(ReadData,sizeof(byte)*i);
+    end 
    else if(i>ReadLength+1) then
     begin
      dec(i);
-     ReallocMem(ReadData,sizeof(Byte)*(i+1));
+     ReallocMem(ReadData,sizeof(Byte)*i);
     end;
    SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
    SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
    inputch:=key.UnicodeChar; sc:=key.ScanCode;
    if(sc=2) and (apos1<(ReadLength+1) div maxbyte*maxbyte) then
     begin
-     if(apos1>=ReadLength div maxbyte*maxbyte-maxbyte+1) and (apos1<=ReadLength div maxbyte*maxbyte) then inc(apos1,ReadLength mod maxbyte)
+     procnum:=(ReadLength+1) div maxbyte+1;
+     if(apos1>=(procnum-1)*maxbyte+1) and (apos1<=procnum*maxbyte) then inc(apos1,ReadLength mod maxbyte)
      else inc(apos1,maxbyte);
     end
    else if(sc=1) and (apos1>maxbyte) then
     begin
      dec(apos1,maxbyte);
     end
-   else if(sc=4) then
+   else if(sc=3) then
     begin
-     if(apos2=2) and (apos1<ReadLength) then
+     if(apos2=2) and (apos1<ReadLength+1) then
       begin
        apos2:=1; inc(apos1);
       end
      else if(apos2=1) then inc(apos2);
     end
-   else if(sc=3) then
+   else if(sc=4) then
     begin
      if(apos2=1) and (apos1>1) then
       begin
@@ -2014,9 +2075,18 @@ begin
     end
    else if(sc=9) then
     begin
+     if(apos1>maxpagebyte) then
+      begin
+       dec(apos1,maxpagebyte);
+      end;
     end
    else if(sc=10) then
     begin
+     procnum:=(ReadLength+1) div maxpagebyte+1;
+     if(apos1<(procnum-1)*maxpagebyte) then
+      begin
+       inc(apos1,maxpagebyte);
+      end;
     end
    else if(sc=23) then
     begin
@@ -2024,11 +2094,56 @@ begin
     end
    else if(sc=8) then
     begin
-     FreeMem(ReadData); ReadLength:=1; ReadData:=allocmem(sizeof(byte));
+     FreeMem(ReadData); ReadLength:=0; ReadData:=allocmem(sizeof(byte));
     end
    else if(inputch<>#0) then
-    begin
+    begin 
+     j:=0;
+     while(j<=15) do
+      begin
+       if(inputch=(hexc1+j)^) or (inputch=(hexc2+j)^) then break;
+       inc(j,1);
+      end;
+     if(j<=15) then
+      begin
+       if(apos1>ReadLength) then 
+        begin
+         inc(ReadLength);
+         ReallocMem(ReadData,sizeof(byte)*(ReadLength+1));
+        end;
+       lefthex:=(ReadData+apos1-1)^ div 16;
+       righthex:=(ReadData+apos1-1)^ mod 16;
+       if(apos2=1) then 
+        begin
+         lefthex:=j; 
+         (ReadData+apos1-1)^:=lefthex*16+righthex;
+         inc(apos2);
+        end
+       else if(apos2=2) then 
+        begin
+         righthex:=j; 
+         (ReadData+apos1-1)^:=lefthex*16+righthex;
+         inc(apos1); apos2:=1;
+        end;
+      end
+     else if(inputch=#8) then
+      begin
+       dec(ReadLength);
+       ReallocMem(ReadData,sizeof(byte)*(ReadLength+1));
+      end;
     end;
+   procnum:=(Readlength+1) div maxbyte+1; arow:=apos1 div maxbyte+1; acolumn:=(apos1-1) mod maxbyte*3+apos2;
+   if(arow>(maxrow-2) div 2) and (arow<procnum-(maxrow-2) div 2) then 
+   efi_console_edit_hex_output_string(systemtable,ReadData,ReadLength,filename,arow-(maxrow-2) div 2,(apos1-1) mod maxbyte*2+apos2,arow)
+   else if(arow<=(maxrow-2) div 2) then 
+   efi_console_edit_hex_output_string(systemtable,ReadData,ReadLength,filename,1,(apos1-1) mod maxbyte*2+apos2,arow)
+   else if(arow>=procnum-(maxrow-2) div 2) then 
+   efi_console_edit_hex_output_string(systemtable,ReadData,ReadLength,filename,procnum-(maxrow-2) div 2,(apos1-1) mod maxbyte*2+apos2,arow);
+   currentcolumn:=acolumn-1; 
+   if(arow>(maxrow-2) div 2) and (arow<procnum-(maxrow-2) div 2) then currentrow:=2+(maxrow-2) div 2
+   else if(arow<=(maxrow-2) div 2) then currentrow:=1+arow
+   else if(arow>=procnum-(maxrow-2) div 2) then currentrow:=2+arow-(procnum-(maxrow-2));
+   efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
   end;
 end;
 procedure efi_console_enable_mouse(SystemTable:Pefi_system_table);cdecl;[public,alias:'EFI_CONSOLE_ENABLE_MOUSE'];

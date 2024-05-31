@@ -1,15 +1,9 @@
-unit uefimain;
-
-interface
+library uefimain;
 
 uses uefi,tydqfs;
 
-function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;cdecl;
-
-implementation
-
-function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;cdecl;[public,alias:'efi_main'];
-var mystr,writestr:PWideChar;
+function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;cdecl;[public,alias:'_DLLMainCRTStartup'];
+var mystr,writestr,partstr:PWideChar;
     status:efi_status;
     edl,eedl:efi_disk_list;
     i,realsize,tydqfscount,procnum:natuint;
@@ -18,6 +12,7 @@ var mystr,writestr:PWideChar;
     fsflist:tydqfs_file_list;
     mybool:boolean;
     fsa:tydqfs_attribute_bool;
+    fsh:tydqfs_header;
     tfsd:tydqfs_data;
 begin
  efi_console_set_global_colour(Systemtable,efi_bck_black,efi_lightgrey);
@@ -83,10 +78,41 @@ begin
      dec(tydqfscount);
     end;
   end;
+ Wstrfree(mystr);
+ if(tydq_fs_systeminfo_read(systemtable,edl).header.tydqsyslang=0) then
+  begin
+   efi_console_output_string(systemtable,'All available TYDQ file systems to be specified to system disk:'#13#10);
+   for i:=1 to edl.disk_count do
+    begin
+     efi_console_output_string(systemtable,'Disk ');
+     partstr:=UintToPWchar(i);
+     efi_console_output_string(systemtable,partstr);
+     Wstrfree(partstr);
+     efi_console_output_string(systemtable,'-');
+     fsh:=tydq_fs_read_header(edl,i);
+     efi_console_output_string(systemtable,@fsh.RootName);
+     efi_console_output_string(systemtable,#13#10);
+    end;
+   if(edl.disk_count=1) then procnum:=1 else
+    begin
+     efi_console_output_string(systemtable,'Enter the index of disk to specify the system disk:');
+     efi_console_read_string(systemtable,mystr);
+     procnum:=PWcharToUint(mystr);
+     while(procnum=0) or (procnum>edl.disk_count) do
+      begin
+       efi_console_output_string(systemtable,'Error:disk index is invaild for specify the system disk.'#10);
+       efi_console_output_string(systemtable,'Enter the index of disk to specify the system disk:');
+       efi_console_read_string(systemtable,mystr);
+       procnum:=PWcharToUint(mystr);
+      end;
+    end;
+   tydq_fs_create_systeminfo_file(systemtable,edl,procnum);
+  end;
  freemem(eedl.disk_content); freemem(eedl.disk_block_content); eedl.disk_count:=0;
  freemem(edl.disk_content); freemem(edl.disk_block_content); edl.disk_count:=0;
+ Wstrfree(mystr);
  edl:=efi_disk_tydq_get_fs_list(systemtable);
- efi_console_output_string(systemtable,'All available tydq file systems:'#13#10);
+ efi_console_output_string(systemtable,'All available TYDQ file systems:'#13#10);
  for i:=1 to edl.disk_count do
   begin
    efi_console_output_string(systemtable,'TYDQ File System ');
@@ -108,17 +134,6 @@ begin
  mybool:=tydq_fs_file_exists(edl,1,'/System/Password.dqi');
  efi_console_output_string(systemtable,UintTOPWChar(tydq_fs_file_position(edl,1,'/System/Password.dqi')));
  efi_console_output_string(systemtable,#13#10);
- if(mybool=true) then efi_console_output_string(systemtable,'TRUE'#13#10)
- else if(mybool=false) then efi_console_output_string(systemtable,'FALSE'#13#10);
- Wstrinit(writestr,1024*128);
- Wstrset(writestr,'Hello UEFI!'#10'Hello UEFI!'#10'Hello UEFI!');
- efi_console_edit_text_file_content_string(systemtable,writestr,'/System/Password.dqi');
- tydq_fs_file_rewrite(systemtable,edl,1,'/System/Password.dqi',0,writestr,(Wstrlen(writestr)+1)*sizeof(WideChar),userlevel_system);
- tfsd:=tydq_fs_file_read(edl,1,'/System/Password.dqi',0,(Wstrlen(writestr)+1)*sizeof(WideChar),userlevel_system);
- efi_console_output_string(systemtable,PWideChar(tfsd.fsdata));
- efi_console_output_string(systemtable,#13#10);
- freemem(edl.disk_content); freemem(edl.disk_block_content); edl.disk_count:=0;
- Wstrfree(writestr);
  efi_console_output_string(systemtable,'Program Terminated......'#13#10);
  while(True) do;
  efi_main:=efi_success;

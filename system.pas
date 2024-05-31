@@ -3,12 +3,13 @@ unit system;
 
 {$POINTERMATH ON}
 interface
+
 {$IFDEF CPU32}
 const maxheap=16777216*8;
-      maxsection=16384*16;
+      maxsection=16384*64;
 {$ELSE CPU32}
 const maxheap=67108864*8;
-      maxsection=65536*16;
+      maxsection=65536*64;
 {$ENDIF CPU32}
 type
   hresult = LongInt;
@@ -111,10 +112,14 @@ type
            lineright:^natuint;
            linecount:natuint;
            end;
-procedure fpc_initialize(data,info:Pointer);compilerproc;
-procedure fpc_finalize(data,Info:Pointer);compilerproc;       
-procedure fpc_specific_handler;compilerproc;
+const mypwd:PChar='PHjueigbEYywLCQiCYRQGleDMUjOceLMBFDMJHEMUzgCleRgkKEnAuVLtSAEFSFhevpEKomPHIbaqxLLGJVMRmZUDFKnvHGfvTwYEOqVaBxEGXMXXuITZixUcMbdTCfWIwysKPSciOnUHgmePRWEWWcNMuePEbGOvNgNbqdMMRlzbocTikuCuQuISgQTWFtVSLUmAObgipXAnNEdUNXKVFBiNTIOornretCNOaEwhQTdIRlYaldWzFiummYKKJJcnDRJovDJTFXpQczJQBDnATyvopuBakmGKXTDsIhKfKNITJlsDkLTlKRKfObLvwpIgXvqmBmiWLKQlhqMyAcUoFxkFNPYeGFCduhGJTNtSMfvbGuupWzugWNrwwZKkwjfIqIdjXMAiVONPcMebzSCvUGtVblwohLzOhlnPKIQBTxpBYufIJesKHeZPUHiYaofkTEDcpRapVwluKFARevxkgjxuEFHgVEuQtAUFMMTszCgrqcuKFnJiZtmDBmYsatb';
+mypwdoffset:array[1..24] of shortint=(-1,-3,-6,-8,-7,-4,-5,-2,0,8,9,10,12,2,3,4,1,9,-9,3,-11,-12,10,-7);
 procedure fpc_handleerror;compilerproc;
+procedure fpc_lib_exit;compilerproc;
+procedure fpc_libinitializeunits;compilerproc;
+procedure fpc_initializeunits;compilerproc;
+procedure fpc_finalizeunits;compilerproc;
+procedure fpc_do_exit;compilerproc;
 function sys_getmem(size:natuint):Pointer;compilerproc;
 procedure sys_freemem(var p:pointer);compilerproc;
 function sys_allocmem(size:natuint):Pointer;compilerproc;
@@ -176,21 +181,33 @@ function UintToHex(inputint:natuint):Pchar;
 function UintToWhex(inputint:natuint):PWideChar;
 function HexToUint(inputhex:PChar):natuint;
 function WHexToUint(inputhex:PWideChar):natuint;
+function PChar_encrypt_to_passwd(oristr:PChar):PChar;
+function PWChar_encrypt_to_passwd(oristr:PWideChar):PChar;
+function Passwd_decrypt_to_PChar(passwdstr:PChar):PChar;
+function Passwd_decrypt_to_PWChar(passwdstr:PChar):PWideChar;
+function PCharToPWChar(orgstr:PChar):PWideChar;
+function PWCharToPChar(orgstr:PWideChar):PChar;
 function Neighborlinegenerate(originalstr,linestr:PWideChar;row:natuint;mcolumn:natuint):neighborline;
 function TotalLineList(originalstr,linefeed:PWideChar;mcolumn:natuint):linelist;
 
 var compheap,sysheap:systemheap;
 implementation
-procedure fpc_initialize(Data,Info:Pointer);compilerproc;[public,alias:'FPC_INITIALIZE'];
-begin
-end;
-procedure fpc_finalize(Data,Info:Pointer);compilerproc;[public,alias:'FPC_FINALIZE'];
-begin
-end;
-procedure fpc_specific_handler;compilerproc;[public,alias:'__FPC_specific_handler'];
-begin
-end;
 procedure fpc_handleerror;compilerproc;[public,alias:'FPC_HANDLEERROR'];
+begin
+end;
+procedure fpc_lib_exit;compilerproc;[public,alias:'FPC_LIB_EXIT'];
+begin
+end;
+procedure fpc_libinitializeunits;compilerproc;[public,alias:'FPC_LIBINITIALIZEUNITS'];
+begin
+end;
+procedure fpc_initializeunits;compilerproc;[public,alias:'FPC_INITIALIZEUNITS'];
+begin
+end;
+procedure fpc_finalizeunits;compilerproc;[public,alias:'FPC_FINALIZEUNITS'];
+begin
+end;
+procedure fpc_do_exit;compilerproc;[public,alias:'FPC_DI_EXIT'];
 begin
 end;
 procedure compheap_delete_item(p:pointer);
@@ -294,7 +311,7 @@ begin
   begin
    for i:=1 to compheap.heapsection[compheap.heapcount,2]-compheap.heapsection[compheap.heapcount,1]+1 do (p2+i-1)^:=(p1+i-1)^;
   end;
- p:=newp+len;
+ compheap_delete_item(p); p:=newp+len-orgsize;
 end;
 procedure sys_move(const source;var dest;count:natuint);compilerproc;[public,alias:'FPC_MOVE'];
 var p1,p2:Pchar;
@@ -954,6 +971,7 @@ const numchar:Pchar='0123456789';
 var i,j,res:natuint;
 begin
  res:=0; i:=0;
+ if(str=nil) then exit(0);
  while ((str+i)^<>#0) do
   begin
    for j:=0 to 9 do 
@@ -971,6 +989,7 @@ const numchar:PWidechar='0123456789';
 var i,j,res:natuint;
 begin
  res:=0; i:=0;
+ if(str=nil) then exit(0);
  while ((str+i)^<>#0) do
   begin
    for j:=0 to 9 do 
@@ -1050,6 +1069,7 @@ var i,j:natuint;
     negative:boolean;
 begin
  res:=0;
+ if(str=nil) then exit(0);
  if(str^='-') then 
   begin
    start:=2;
@@ -1073,6 +1093,7 @@ var i,j:natuint;
     negative:boolean;
 begin
  res:=0;
+ if(str=nil) then exit(0);
  if(str^='-') then 
   begin
    start:=2;
@@ -1174,6 +1195,133 @@ begin
    res:=res*16+j;
   end;
  WHexToUint:=res;
+end;
+function PChar_encrypt_to_passwd(oristr:PChar):PChar;[public,alias:'PChar_encrypt_to_passwd'];
+var i,index,len:natuint;
+    res:PChar;
+begin
+ i:=0; len:=strlen(oristr);
+ strinit(res,len*2);
+ while(i<len) do
+  begin 
+   inc(i);
+   index:=(Byte((oristr+i-1)^)+mypwdoffset[i mod 24+1]+256) mod 256;
+   (res+i*2-2)^:=Char(Byte((mypwd+index*2)^)+128);
+   (res+i*2-1)^:=Char(Byte((mypwd+index*2+1)^)+128);
+  end;
+ (res+len*2)^:=#0;
+ PChar_encrypt_to_passwd:=res;
+end;
+function PWChar_encrypt_to_passwd(oristr:PWideChar):PChar;[public,alias:'PWChar_encrypt_to_passwd'];
+var i,index,len:natuint;
+    res:PChar;
+begin
+ i:=0; len:=Wstrlen(oristr);
+ strinit(res,len*4);
+ while(i<len) do
+  begin 
+   inc(i);
+   index:=(Word((oristr+i-1)^)+mypwdoffset[i mod 24+1]+65536) mod 65536;
+   (res+i*4-4)^:=Char(Byte((mypwd+index div 256*2)^)+128);
+   (res+i*4-3)^:=Char(Byte((mypwd+index div 256*2+1)^)+128);
+   (res+i*4-2)^:=Char(Byte((mypwd+index mod 256*2)^)+128);
+   (res+i*4-1)^:=Char(Byte((mypwd+index mod 256*2+1)^)+128);
+  end;
+ (res+len*4)^:=#0;
+ PWChar_encrypt_to_passwd:=res;
+end;
+function Passwd_decrypt_to_PChar(passwdstr:PChar):PChar;[public,alias:'Passwd_decrypt_to_PChar'];
+var i,j,index,len:natuint;
+    res,partstr,partstr2:PChar;
+begin
+ i:=0; len:=strlen(passwdstr) div 2;
+ strinit(res,len);
+ while(i<len) do
+  begin
+   inc(i);
+   partstr:=StrCopy(passwdstr,i*2-1,2);
+   j:=1;
+   while(j<=256) do
+    begin
+     partstr2:=StrCopy(mypwd,j*2-1,2);
+     partstr2^:=Char(Byte(partstr2^)-128);
+     (partstr2+1)^:=Char(Byte((partstr2+1)^)-128);
+     if(StrCmp(partstr,partstr2)=0) then break;
+     Strfree(partstr2);
+     inc(j,1);
+    end;
+   if(j>256) then break;
+   if(partstr2<>nil) then Strfree(partstr2);
+   (res+i-1)^:=Char((j-1-mypwdoffset[i mod 24+1]+256) mod 256);
+   Strfree(partstr);
+  end;
+ (res+len)^:=#0;
+ Passwd_decrypt_to_PChar:=res;
+end;
+function Passwd_decrypt_to_PWChar(passwdstr:PChar):PWideChar;[public,alias:'Passwd_decrypt_to_PWChar'];
+var i,j,k,index,len:natuint;
+    res:PWideChar;
+    partstr,partstr2:PChar;
+begin
+ i:=0; len:=strlen(passwdstr) div 4;
+ Wstrinit(res,len);
+ while(i<len) do
+  begin
+   inc(i);
+   partstr:=StrCopy(passwdstr,i*4-3,4);
+   j:=1;
+   while(j<=256) do
+    begin
+     partstr2:=StrCopy(mypwd,j*2-1,2);
+     partstr2^:=Char(Byte(partstr2^)-128);
+     (partstr2+1)^:=Char(Byte((partstr2+1)^)-128);
+     if(StrCmp(StrCopy(partstr,1,2),partstr2)=0) then break;
+     Strfree(partstr2);
+     inc(j,1);
+    end;
+   if(j>256) then break;
+   if(partstr2<>nil) then Strfree(partstr2);
+   k:=1;
+   while(k<=256) do
+    begin
+     partstr2:=StrCopy(mypwd,k*2-1,2);
+     partstr2^:=Char(Byte(partstr2^)-128);
+     (partstr2+1)^:=Char(Byte((partstr2+1)^)-128);
+     if(StrCmp(StrCopy(partstr,3,2),partstr2)=0) then break;
+     Strfree(partstr2);
+     inc(k,1);
+    end;
+   if(k>256) then break;
+   if(partstr2<>nil) then Strfree(partstr2);
+   (res+i-1)^:=WideChar(((j-1)*256+k-1-mypwdoffset[i mod 24+1]+65536) mod 65536);
+   Strfree(partstr);
+  end;
+ (res+len)^:=#0;
+ Passwd_decrypt_to_PWChar:=res;
+end;
+function PCharToPWChar(orgstr:PChar):PWideChar;[public,alias:'PCharToPWChar'];
+var res:PWideChar;
+    len,i:natuint;
+begin
+  len:=strlen(orgstr); i:=1;
+  Wstrinit(res,len);
+  while(i<=len+1) do
+   begin
+    (res+i-1)^:=WideChar(Word((orgstr+i-1)^)); inc(i);
+   end;
+  PCharToPWChar:=res;
+end;
+function PWCharToPChar(orgstr:PWideChar):PChar;[public,alias:'PWCharToPChar'];
+var res:PChar;
+    len,i:natuint;
+begin
+  len:=Wstrlen(orgstr); i:=1;
+  strinit(res,len);
+  while(i<=len+1) do
+   begin
+    (res+i-1)^:=Char(Byte((orgstr+i-1)^)); inc(i);
+   end;
+  PWCharToPChar:=res;
 end;
 function Neighborlinegenerate(originalstr,linestr:PWideChar;row:natuint;mcolumn:natuint):neighborline;[public,alias:'Neighborlinegenerate'];
 var res:neighborline;

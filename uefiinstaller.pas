@@ -1,24 +1,19 @@
-unit uefiinstaller;
-
-interface
+library uefiinstaller;
 
 uses uefi,tydqfs;
 
-function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;cdecl;
-
-implementation
-
-function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;cdecl;[public,alias:'efi_main'];
-var mystr:PWideChar;
-    cdindex,hdindex,emptyindex,emptynum:natuint;
+function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;cdecl;[public,alias:'_DLLMainCRTStartup'];
+var mystr,partstr:PWideChar;
+    cdindex,hdindex,emptyindex,emptynum,procnum:natuint;
     verifydata:qword;
-    i,realsize:natuint;
+    i,j,realsize:natuint;
     status:efi_status;
     efsl:efi_file_system_list;
     efslext:efi_file_system_list_ext;
     efp:Pefi_file_protocol;
     efsi:efi_file_system_info;
     edl,edl2,edl3,edl4:efi_disk_list;
+    fsh:tydqfs_header;
     mybool:boolean;
 begin
  efi_console_set_global_colour(Systemtable,efi_bck_black,efi_lightgrey);
@@ -69,14 +64,14 @@ begin
   efi_console_output_string(systemtable,'Do you want to install the cdrom to the hard disk(Y or y is yes,other is no)?'#13#10);
   efi_console_output_string(systemtable,'Your answer:');
   efi_console_read_string(systemtable,mystr);
-  while(WstrCmp(mystr,'Y')<>0) and (WstrCmp(mystr,'y')<>0) do
+  while((WstrCmp(mystr,'Y')<>0) and (WstrCmp(mystr,'y')<>0)) or (Wstrlen(mystr)=0)  do
    begin
-    if(WstrCmp(mystr,'Y')<>0) and (WstrCmp(mystr,'y')<>0) then
+    if((WstrCmp(mystr,'Y')<>0) and (WstrCmp(mystr,'y')<>0)) or (Wstrlen(mystr)=0) then
      begin
       efi_console_output_string(systemtable,'Do you want to exit the installer(Y or y is yes,other is no)?'#13#10);
       efi_console_output_string(systemtable,'Your answer:');
       efi_console_read_string(systemtable,mystr);
-      if(WstrCmp(mystr,'Y')=0) or (WstrCmp(mystr,'y')=0) then
+      if((WstrCmp(mystr,'Y')=0) or (WstrCmp(mystr,'y')=0)) and (Wstrlen(mystr)>0) then
        begin
         SystemTable^.RuntimeServices^.ResetSystem(EfiResetShutdown,efi_success,0,nil);
        end;
@@ -99,6 +94,7 @@ begin
       efi_console_output_string(systemtable,'Select the cdrom to install:');
       efi_console_read_string(systemtable,mystr);
       cdindex:=PWCharToUint(mystr);
+      Wstrfree(mystr);
       if(cdindex>=efsl.file_system_count+1) then efi_console_output_string(systemtable,'Error:Invaild Cdrom.'+#13#10);
      end;
    end;
@@ -110,6 +106,7 @@ begin
       efi_console_output_string(systemtable,'Select the hard disk to be installed:');
       efi_console_read_string(systemtable,mystr);
       hdindex:=PWCharToUint(mystr);
+      Wstrfree(mystr);
       if(hdindex>=edl.disk_count+1) then efi_console_output_string(systemtable,'Error:Invaild Hard Disk.'+#13#10);
      end;
    end;
@@ -184,7 +181,7 @@ begin
      efi_console_output_string(systemtable,'Do you want to format the empty disk to TYDQ File System(Y or y is yes,other is no)?'#13#10);
      efi_console_output_string(systemtable,'Your answer:');
      efi_console_read_string(systemtable,mystr);
-     if(WStrCmp(mystr,'Y')=0) or (WStrCmp(mystr,'y')=0) then
+     if((WStrCmp(mystr,'Y')=0) or (WStrCmp(mystr,'y')=0)) and (WStrlen(mystr)>0) then
       begin
        efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
        efi_console_read_string(systemtable,mystr);
@@ -242,6 +239,48 @@ begin
      efi_console_output_string(systemtable,'No disk available for TYDQ system install,installer terminated.');
      while True do;
     end;
+   freemem(edl.disk_content); freemem(edl.disk_block_content); edl.disk_count:=0;
+   edl:=efi_disk_tydq_get_fs_list(systemtable);
+   if(edl.disk_count>0) then
+    begin
+     efi_console_output_string(systemtable,'Do you want to specify the system disk in the installer stage 2(Y or y is yes,other is no)?'#13#10);
+     efi_console_output_string(systemtable,'Your answer:');
+     efi_console_read_string(systemtable,mystr);
+     if((WstrCmp(mystr,'Y')=0) or (Wstrcmp(mystr,'y')=0)) and (Wstrlen(mystr)=1) then
+      begin
+       for j:=1 to edl.disk_count do
+        begin
+         efi_console_output_string(systemtable,'Disk ');
+         partstr:=UintToPWChar(j);
+         efi_console_output_string(systemtable,partstr);
+         Wstrfree(partstr);
+         efi_console_output_string(systemtable,'-');
+         fsh:=tydq_fs_read_header(edl,j);
+         efi_console_output_string(systemtable,@fsh.RootName);
+         efi_console_output_string(systemtable,#13#10);
+        end;
+       if(edl.disk_count=1) then procnum:=1 else
+        begin
+        efi_console_output_string(systemtable,'The system disk index you want to format:');
+        efi_console_read_string(systemtable,mystr);
+        procnum:=PWCharToUint(mystr);
+        end;
+       while(procnum=0) or (procnum>edl.disk_count) do
+        begin
+         efi_console_output_string(systemtable,'Error:system disk index invaild.'#13#10);
+         efi_console_output_string(systemtable,'The disk index you want to format:');
+         efi_console_read_string(systemtable,mystr);
+         procnum:=PWCharToUint(mystr);
+        end;
+       tydq_fs_create_systeminfo_file(systemtable,edl,procnum);
+      end
+     else
+      begin
+       efi_console_output_string(systemtable,'You will specify the system disk later in the main program.'#13#10);
+      end;
+     Wstrfree(mystr);
+    end;
+   freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
    efi_console_output_string(systemtable,'Stage 2 Install done!Now you can restart your installer to enter the system!'#13#10);
    SystemTable^.RuntimeServices^.ResetSystem(EfiResetWarm,efi_success,0,nil);
   end
@@ -313,7 +352,7 @@ begin
      efi_console_output_string(systemtable,'Do you want to format the empty disk to TYDQ File System(Y or y is yes,other is no)?'#13#10);
      efi_console_output_string(systemtable,'Your answer:');
      efi_console_read_string(systemtable,mystr);
-     if(WStrCmp(mystr,'Y')=0) or (WStrCmp(mystr,'y')=0) then
+     if((WStrCmp(mystr,'Y')=0) or (WStrCmp(mystr,'y')=0)) and (Wstrlen(mystr)>0) then
       begin
        efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
        efi_console_read_string(systemtable,mystr);
@@ -331,6 +370,7 @@ begin
          efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
          efi_console_read_string(systemtable,mystr);
          emptynum:=PWCharToUint(mystr);
+         Wstrfree(mystr);
         end;
        if(emptynum<=edl2.disk_count) then
         begin
@@ -343,6 +383,7 @@ begin
            efi_console_output_string(systemtable,' is:');
            efi_console_read_String(systemtable,mystr);
            emptyindex:=PWcharToUint(mystr);
+           Wstrfree(mystr);
            ((edl2.disk_content+emptyindex-1)^)^.ReadDisk((edl2.disk_content+emptyindex-1)^,
            ((edl2.disk_block_content+emptyindex-1)^)^.Media^.MediaId,0,8,verifydata);
            if(emptyindex>edl2.disk_count) or (emptyindex=0) then
@@ -383,6 +424,48 @@ begin
      efi_console_output_string(systemtable,'No disk available for TYDQ system install,installer terminated.');
      while True do;
     end;
+    freemem(edl.disk_content); freemem(edl.disk_block_content); edl.disk_count:=0;
+    edl:=efi_disk_tydq_get_fs_list(systemtable);
+    if(edl.disk_count>0) then
+     begin
+      efi_console_output_string(systemtable,'Do you want to specify the system disk in the installer stage 2(Y or y is yes,other is no)?'#13#10);
+      efi_console_output_string(systemtable,'Your answer:');
+      efi_console_read_string(systemtable,mystr);
+      if((WstrCmp(mystr,'Y')=0) or (Wstrcmp(mystr,'y')=0)) and (Wstrlen(mystr)=1) then
+      begin
+       for j:=1 to edl.disk_count do
+        begin
+         efi_console_output_string(systemtable,'Disk ');
+         partstr:=UintToPWChar(j);
+         efi_console_output_string(systemtable,partstr);
+         Wstrfree(partstr);
+         efi_console_output_string(systemtable,'-');
+         fsh:=tydq_fs_read_header(edl,j);
+         efi_console_output_string(systemtable,@fsh.RootName);
+         efi_console_output_string(systemtable,#13#10);
+         end;
+       if(edl.disk_count=1) then procnum:=1 else
+        begin
+         efi_console_output_string(systemtable,'The system disk index you want to format:');
+         efi_console_read_string(systemtable,mystr);
+         procnum:=PWCharToUint(mystr);
+        end;
+       while(procnum=0) or (procnum>edl.disk_count) do
+        begin
+         efi_console_output_string(systemtable,'Error:system disk index invaild.'#13#10);
+         efi_console_output_string(systemtable,'The disk index you want to format:');
+         efi_console_read_string(systemtable,mystr);
+         procnum:=PWCharToUint(mystr);
+        end;
+       tydq_fs_create_systeminfo_file(systemtable,edl,procnum);
+      end
+     else
+      begin
+       efi_console_output_string(systemtable,'You will specify the system disk later in the main program.'#13#10);
+      end;
+     Wstrfree(mystr);
+    end;
+   freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
    efi_console_output_string(systemtable,'Stage 2 Install done!Now you can restart your installer to enter the system!'#13#10);
    SystemTable^.RuntimeServices^.ResetSystem(EfiResetWarm,efi_success,0,nil);
   end;
