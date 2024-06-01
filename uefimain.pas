@@ -3,7 +3,7 @@ library uefimain;
 uses uefi,tydqfs;
 
 function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;cdecl;[public,alias:'_DLLMainCRTStartup'];
-var mystr,writestr,partstr:PWideChar;
+var mystr,mystr2,mystr3,writestr,partstr:PWideChar;
     status:efi_status;
     edl,eedl:efi_disk_list;
     i,realsize,tydqfscount,procnum:natuint;
@@ -14,12 +14,14 @@ var mystr,writestr,partstr:PWideChar;
     fsa:tydqfs_attribute_bool;
     fsh:tydqfs_header;
     tfsd:tydqfs_data;
+    fsi:tydqfs_system_info;
 begin
  efi_console_set_global_colour(Systemtable,efi_bck_black,efi_lightgrey);
  efi_console_clear_screen(systemtable);
  efi_console_get_max_row_and_max_column(systemtable,true);
  efi_console_enable_mouse(systemtable);
  efi_console_enable_mouse_blink(systemtable,true,500);
+ efi_set_watchdog_timer_to_null(systemtable);
  efi_console_output_string(systemtable,'Welcome to TYDQ System!'+#13#10);
  eedl:=efi_disk_empty_list(systemtable); edl:=efi_disk_tydq_get_fs_list(systemtable);
  if(eedl.disk_count>0) and (edl.disk_count=0) then
@@ -129,11 +131,179 @@ begin
    efi_console_output_string(systemtable,UintToPWChar(myfsh.usedsize));
    efi_console_output_string(systemtable,#13#10);
   end;
+ fsi:=tydq_fs_systeminfo_read(systemtable,edl);
+ if(fsi.header.tydqusercount>1) then
+  begin
+   efi_console_output_string(systemtable,'Accounts exist,Do you want to login(Y or y is yes,other is no)?'#10);
+   efi_console_output_string(systemtable,'Your answer:');
+   efi_console_read_string(systemtable,mystr);
+   if((Wstrcmp(mystr,'Y')=0) or (WStrcmp(mystr,'y')=0)) and (WStrlen(mystr)=1) then
+    begin
+     efi_console_output_string(systemtable,'Enter your account name:');
+     efi_console_read_string(systemtable,mystr);
+     while(tydq_fs_systeminfo_get_index(fsi,mystr)<=1) do
+      begin
+       efi_console_output_string(systemtable,'Error:Typed user name does not exist.'#10);
+       efi_console_output_string(systemtable,'Enter your account name:');
+       efi_console_read_string(systemtable,mystr);
+      end;
+     mystr2:=tydq_fs_systeminfo_get_passwd(fsi,mystr);
+     efi_console_output_string(systemtable,'Enter your account ');
+     efi_console_output_string(systemtable,mystr);
+     efi_console_output_string(systemtable,#39's password:');
+     efi_console_read_password_string(systemtable,mystr3);
+     while(Wstrcmp(mystr2,mystr3)<>0) or (Wstrlen(mystr2)<>Wstrlen(mystr3)) do 
+      begin
+       efi_console_output_string(systemtable,'Error:Typed password is inaccurate.'#10);
+       efi_console_output_string(systemtable,'Enter your account:');
+       efi_console_output_string(systemtable,mystr);
+       efi_console_output_string(systemtable,#39's password:');
+       efi_console_read_password_string(systemtable,mystr3);
+      end;
+     efi_console_output_string(systemtable,'You successfully enter the TYDQ System!'#10);
+     FreeMem(mystr3); FreeMem(mystr2); Freemem(mystr);
+    end
+   else
+    begin
+     efi_console_output_string(systemtable,'Now you can create a new account to enter TYDQ System.'#10);
+     efi_console_output_string(systemtable,'Set your account name:');
+     efi_console_read_string(systemtable,mystr);
+     while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) or (tydq_fs_systeminfo_get_index(fsi,mystr)<>0) do
+      begin
+       if(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) then efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10)
+       else if(tydq_fs_systeminfo_get_index(fsi,mystr)<>0) then efi_console_output_string(systemtable,'Error:Account Name already exists.'#10);
+       efi_console_output_string(systemtable,'Set your account name:');
+       efi_console_read_string(systemtable,mystr);
+      end;
+     efi_console_output_string(systemtable,'Set your account password(Password length must be in 1-128):');
+     efi_console_read_password_string(systemtable,mystr2);
+     while(Wstrlen(mystr2)=0) or (Wstrlen(mystr2)>128) do
+      begin
+       efi_console_output_string(systemtable,'Error:Account password is invaild.'#10);
+       efi_console_output_string(systemtable,'Set your account pssword:');
+       efi_console_read_string(systemtable,mystr);
+      end;
+     efi_console_output_string(systemtable,'Verify your account password:');
+     efi_console_read_password_string(systemtable,mystr3);
+     while(Wstrcmp(mystr2,mystr3)<>0) or (WStrlen(mystr2)<>Wstrlen(mystr3)) do
+      begin
+       efi_console_output_string(systemtable,'Error:Typed password does not match your password.'#10);
+       efi_console_output_string(systemtable,'Verify your account password:');
+       efi_console_read_password_string(systemtable,mystr3);
+      end;
+     tydq_fs_systeminfo_add_user(fsi,mystr,mystr2);
+     tydq_fs_systeminfo_write(systemtable,edl,fsi);
+     Wstrfree(mystr3); Wstrfree(mystr2); Wstrfree(mystr);
+     efi_console_output_string(systemtable,'Automatically enter the TYDQ System!'#10);
+    end;
+  end
+ else if(fsi.header.tydqusercount>0) then 
+  begin
+   efi_console_output_string(systemtable,'Account exists,Do you want to login(Y or y is yes,other is no)?'#10);
+   efi_console_output_string(systemtable,'Your answer:');
+   efi_console_read_string(systemtable,mystr);
+   if((Wstrcmp(mystr,'Y')=0) or (WStrcmp(mystr,'y')=0)) and (WStrlen(mystr)=1) then
+    begin
+     efi_console_output_string(systemtable,'Enter your account name:');
+     efi_console_read_string(systemtable,mystr);
+     while(tydq_fs_systeminfo_get_index(fsi,mystr)<=1) do
+      begin
+       efi_console_output_string(systemtable,'Error:Typed user name does not exist.'#10);
+       efi_console_output_string(systemtable,'Enter your account name:');
+       efi_console_read_string(systemtable,mystr);
+      end;
+     mystr2:=tydq_fs_systeminfo_get_passwd(fsi,mystr);
+     efi_console_output_string(systemtable,'Enter your account ');
+     efi_console_output_string(systemtable,mystr);
+     efi_console_output_string(systemtable,#39's password:');
+     efi_console_read_password_string(systemtable,mystr3);
+     while(Wstrcmp(mystr2,mystr3)<>0) or (Wstrlen(mystr2)<>Wstrlen(mystr3)) do 
+      begin
+       efi_console_output_string(systemtable,'Error:Typed password is inaccurate.'#10);
+       efi_console_output_string(systemtable,'Enter your account ');
+       efi_console_output_string(systemtable,mystr);
+       efi_console_output_string(systemtable,#39's password:');
+       efi_console_read_password_string(systemtable,mystr3);
+      end;
+     efi_console_output_string(systemtable,'You successfully enter the TYDQ System!'#10);
+     FreeMem(mystr3); FreeMem(mystr2); Freemem(mystr);
+    end
+   else
+    begin
+     efi_console_output_string(systemtable,'Now you can create a new account to enter TYDQ System.'#10);
+     efi_console_output_string(systemtable,'Set your account name:');
+     efi_console_read_string(systemtable,mystr);
+     while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) or (tydq_fs_systeminfo_get_index(fsi,mystr)<>0) do
+      begin
+       if(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) then efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10)
+       else if(tydq_fs_systeminfo_get_index(fsi,mystr)<>0) then efi_console_output_string(systemtable,'Error:Account Name already exists.'#10);
+       efi_console_output_string(systemtable,'Set your account name:');
+       efi_console_read_string(systemtable,mystr);
+      end;
+     efi_console_output_string(systemtable,'Set your account password(Password length must be in 1-128):');
+     efi_console_read_password_string(systemtable,mystr2);
+     while(Wstrlen(mystr2)=0) or (Wstrlen(mystr2)>128) do
+      begin
+       efi_console_output_string(systemtable,'Error:Account password is invaild.'#10);
+       efi_console_output_string(systemtable,'Set your account password:');
+       efi_console_read_password_string(systemtable,mystr);
+      end;
+     efi_console_output_string(systemtable,'Verify your account password:');
+     efi_console_read_password_string(systemtable,mystr3);
+     while(Wstrcmp(mystr2,mystr3)<>0) or (WStrlen(mystr2)<>Wstrlen(mystr3)) do
+      begin
+       efi_console_output_string(systemtable,'Error:Typed password does not match your password.'#10);
+       efi_console_output_string(systemtable,'Verify your account password:');
+       efi_console_read_password_string(systemtable,mystr3);
+      end;
+     tydq_fs_systeminfo_add_user(fsi,mystr,mystr2);
+     tydq_fs_systeminfo_write(systemtable,edl,fsi);
+     Wstrfree(mystr3); Wstrfree(mystr2); Wstrfree(mystr);
+     efi_console_output_string(systemtable,'Automatically enter the TYDQ System!'#10);
+    end;
+  end
+ else if(fsi.header.tydqusercount=0) then
+  begin
+   efi_console_output_string(systemtable,'Account does not exist,you must create an account for you to enter the system.'#10);
+   efi_console_output_string(systemtable,'Set your account name:');
+   efi_console_read_string(systemtable,mystr);
+   while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) or (tydq_fs_systeminfo_get_index(fsi,mystr)<>0) do
+    begin
+     if(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) then efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10)
+     else if(tydq_fs_systeminfo_get_index(fsi,mystr)<>0) then efi_console_output_string(systemtable,'Error:Account Name already exists.'#10);
+     efi_console_output_string(systemtable,'Set your account name:');
+     efi_console_read_string(systemtable,mystr);
+    end;
+   efi_console_output_string(systemtable,'Set your account password(Password length must be in 1-128):');
+   efi_console_read_password_string(systemtable,mystr2);
+   while(Wstrlen(mystr2)=0) or (Wstrlen(mystr2)>128) do
+    begin
+     efi_console_output_string(systemtable,'Error:Account password is invaild.'#10);
+     efi_console_output_string(systemtable,'Set your account password:');
+     efi_console_read_string(systemtable,mystr);
+    end;
+   efi_console_output_string(systemtable,'Verify your account password:');
+   efi_console_read_password_string(systemtable,mystr3);
+   while(Wstrcmp(mystr2,mystr3)<>0) or (WStrlen(mystr2)<>Wstrlen(mystr3)) do
+    begin
+     efi_console_output_string(systemtable,'Error:Typed password does not match your password.'#10);
+     efi_console_output_string(systemtable,'Verify your account password:');
+     efi_console_read_password_string(systemtable,mystr3);
+    end;
+   tydq_fs_systeminfo_add_user(fsi,mystr,mystr2);
+   tydq_fs_systeminfo_write(systemtable,edl,fsi);
+   Wstrfree(mystr3); Wstrfree(mystr2); Wstrfree(mystr);
+   efi_console_output_string(systemtable,'Automatically enter the TYDQ System!'#10);
+  end;
+ procnum:=tydq_fs_systeminfo_disk_index(systemtable,edl);
+ fsh:=tydq_fs_read_header(edl,procnum);
+ WStrset(tydqcurrentdiskname,@fsh.RootName);
+ WStrSet(tydqcurrentpath,'/');
+ efi_console_output_string(systemtable,'Wait for 10 seconds to enter TYDQ system!'#10);
+ SystemTable^.BootServices^.Stall(10000);
+ efi_console_clear_screen(systemtable);
  efi_console_output_string(systemtable,'Type the commands to operate the TYDQ System(-h or --help for help!)'#13#10);
- tydq_fs_create_file(systemtable,edl,1,'/System/Password.dqi',tydqfs_normal_file,userlevel_system);
- mybool:=tydq_fs_file_exists(edl,1,'/System/Password.dqi');
- efi_console_output_string(systemtable,UintTOPWChar(tydq_fs_file_position(edl,1,'/System/Password.dqi')));
- efi_console_output_string(systemtable,#13#10);
+ freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
  efi_console_output_string(systemtable,'Program Terminated......'#13#10);
  while(True) do;
  efi_main:=efi_success;

@@ -1338,6 +1338,7 @@ procedure efi_console_clear_screen(SystemTable:Pefi_system_table);cdecl;
 procedure efi_console_output_string(SystemTable:Pefi_system_table;outputstring:PWideChar);cdecl;
 procedure efi_set_watchdog_timer_to_null(SystemTable:Pefi_system_table);cdecl;
 procedure efi_console_read_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);cdecl;
+procedure efi_console_read_password_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);cdecl;
 procedure efi_console_enable_mouse(SystemTable:Pefi_system_table);cdecl;
 procedure efi_console_set_global_colour(SystemTable:Pefi_system_table;backgroundcolour:byte;textcolour:byte);cdecl;
 procedure efi_console_set_cursor_position(SystemTable:Pefi_system_table;column,row:natuint);cdecl;
@@ -1427,11 +1428,6 @@ begin
        SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
        inc(currentrow); currentcolumn:=0; inc(i,1);
       end
-     else if((outputstring+i-1)^=#10) or ((outputstring+i-1)^=#13) then
-      begin
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
-       inc(currentrow); currentcolumn:=0; inc(i,1);
-      end
      else
       begin
        mychar[1]:=(outputstring+i-1)^;
@@ -1445,7 +1441,7 @@ begin
      if((outputstring+i-1)^=#13) or ((outputstring+i-1)^=#10) then
       begin
        SystemTable^.ConOut^.OutputString(Systemtable^.ConOut,#13#10);
-       inc(currentrow); inc(i,1);
+       inc(currentrow); currentcolumn:=0; inc(i,1);
       end
      else
       begin
@@ -1491,11 +1487,6 @@ begin
        SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
        inc(currentrow); currentcolumn:=0; inc(i,1);
       end
-     else if((outputstring+i-1)^=#10) or ((outputstring+i-1)^=#13) then
-      begin
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
-       inc(currentrow); currentcolumn:=0; inc(i,1);
-      end
      else
       begin
        mychar[1]:=(outputstring+i-1)^;
@@ -1509,7 +1500,7 @@ begin
      if((outputstring+i-1)^=#13) or ((outputstring+i-1)^=#10) then
       begin
        SystemTable^.ConOut^.OutputString(Systemtable^.ConOut,#13#10);
-       inc(currentrow); inc(i,1);
+       inc(currentrow); currentcolumn:=0; inc(i,1);
       end
      else
       begin
@@ -1583,6 +1574,46 @@ begin
       end;
      if(currentrow>=maxrow) then efi_console_clear_screen(SystemTable);
      SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@(ReadString+i-1)^);
+    end
+   else dec(i);
+   efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
+  end;
+end;
+procedure efi_console_read_password_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_READ_PASSWORD_STRING'];
+var key:efi_input_key;
+    waitidx,i,j:natuint;
+begin
+ SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,consolebck shl 4+consoletex);
+ if(ReadString<>nil) then freemem(ReadString);
+ Readstring:=getmem(sizeof(WideChar)*1025); i:=0;
+ while (True) do
+  begin
+   inc(i);
+   if(i>1024) then break;
+   SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
+   SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
+   if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
+   if((ReadString+i-1)^=#10) or ((ReadString+i-1)^=#13) then
+    begin
+     (ReadString+i-1)^:=#0; 
+     SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
+     currentcolumn:=0; inc(currentrow);
+     if(currentrow>=maxrow) then efi_console_clear_screen(SystemTable);
+     break;
+    end
+   else if((ReadString+i-1)^=#8) then
+    begin
+     if(i>0) then
+      begin 
+       (ReadString+i-1)^:=#0; dec(i);  
+       if(i>0) then
+        begin
+         (ReadString+i-1)^:=#0; dec(i);
+        end;
+      end;
+    end
+   else if((ReadString+i-1)^<>#0) then
+    begin
     end
    else dec(i);
    efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);

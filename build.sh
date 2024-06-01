@@ -1,20 +1,20 @@
 	mkdir installer
 	mkdir kernel
-	/home/tydq/source/compiler/ppcx64 -n -O1 -Si -Sc -Sg -Xd -Ur -Us -CX -XXs -Rintel -Twin64 -Cg system.pas
-	/home/tydq/source/compiler/ppcx64 -n -O1 -Si -Sc -Sg -Xd -Ur -CX -XXs -Rintel -Twin64 -Cg fpintres.pas
-	/home/tydq/source/compiler/ppcx64 -n -O1 -Si -Sc -Sg -Xd -Ur -CX -XXs -Rintel -Twin64 -Cg sysinit.pas
-	/home/tydq/source/compiler/ppcx64 -n -O1 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Rintel -Twin64 -Cg uefiinstaller.pas
-	/home/tydq/source/compiler/ppcx64 -n -O1 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Rintel -Twin64 -Cg uefimain.pas
+	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -Us -CX -XXs -Rintel -Twin64 -Cg system.pas
+	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Rintel -Twin64 -Cg fpintres.pas
+	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Rintel -Twin64 -Cg sysinit.pas
+	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Rintel -Twin64 -Cg uefiinstaller.pas
+	/home/tydq/source/compiler/ppcx64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Rintel -Twin64 -Cg uefimain.pas
 	objcopy -I pei-x86-64 -O efi-app-x86_64 uefiinstaller.dll installer/bootx64.efi
 	objcopy -I pei-x86-64 -O efi-app-x86_64 uefimain.dll kernel/bootx64.efi
 	rm -rf *.o
 	rm -rf *.ppu
 	rm -rf *.dll
-	/home/tydq/source/compiler/ppca64 -n -O1 -Si -Sc -Sg -Xd -Ur -Us -CX -XXs -Cg system.pas
-	/home/tydq/source/compiler/ppca64 -n -O1 -Si -Sc -Sg -Xd -Ur -CX -XXs -Cg fpintres.pas
-	/home/tydq/source/compiler/ppca64 -n -O1 -Si -Sc -Sg -Xd -Ur -CX -XXs -Cg sysinit.pas
-	/home/tydq/source/compiler/ppca64 -n -O1 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg uefiinstaller.pas
-	/home/tydq/source/compiler/ppca64 -n -O1 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg uefimain.pas
+	/home/tydq/source/compiler/ppca64 -n -O4 -Si -Sc -Sg -Xd -Ur -Us -CX -XXs -Cg system.pas
+	/home/tydq/source/compiler/ppca64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Cg fpintres.pas
+	/home/tydq/source/compiler/ppca64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Cg sysinit.pas
+	/home/tydq/source/compiler/ppca64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg uefiinstaller.pas
+	/home/tydq/source/compiler/ppca64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg uefimain.pas
 	loongarch64-linux-gnu-objcopy -O efi-app-aarch64 libuefiinstaller.so installer/bootloongarch.efi
 	loongarch64-linux-gnu-objcopy -O efi-app-aarch64 libuefimain.so kernel/bootloongarch.efi
 	rm -rf *.o

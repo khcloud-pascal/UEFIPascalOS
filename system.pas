@@ -131,6 +131,7 @@ function allocmem(size:natuint):Pointer;
 function getmemsize(p:Pointer):natuint;
 procedure reallocmem(var p:Pointer;size:natuint);
 procedure move(const source;var dest;count:natuint);
+procedure sysheap_clear_all;
 function strlen(str:Pchar):natuint;
 function wstrlen(str:PWideChar):natuint;
 procedure strinit(var str:PChar;size:natuint);
@@ -194,6 +195,7 @@ var compheap,sysheap:systemheap;
 implementation
 procedure fpc_handleerror;compilerproc;[public,alias:'FPC_HANDLEERROR'];
 begin
+ while (True) do;
 end;
 procedure fpc_lib_exit;compilerproc;[public,alias:'FPC_LIB_EXIT'];
 begin
@@ -294,6 +296,10 @@ begin
   end;
  dec(compheap.heaprest,size);
  newp:=Pointer(compheap.heapsection[compheap.heapcount,1]);
+ if(p=nil) then
+  begin
+   newp:=p; exit;
+  end;
  i:=1;
  while(i<=compheap.heapcount)do
   begin
@@ -336,7 +342,6 @@ begin
    for k:=sysheap.heapsection[j,1] to sysheap.heapsection[j,2] do
     begin
      sysheap.heapcontent[k-len-Qword(@sysheap.heapcontent)+1]:=sysheap.heapcontent[k-Qword(@sysheap.heapcontent)+1];
-     sysheap.heapcontent[k-Qword(@sysheap.heapcontent)+1]:=0;
     end;
    sysheap.heapsection[j-1,1]:=sysheap.heapsection[j,1]-len;
    sysheap.heapsection[j-1,2]:=sysheap.heapsection[j,2]-len;
@@ -389,6 +394,7 @@ function getmemsize(p:Pointer):natuint;[public,alias:'getmemsize'];
 var i:natuint;
 begin
  i:=1;
+ if(p=nil) then exit(0);
  while(i<=sysheap.heapcount) do
   begin
    if(NatUint(p)>=sysheap.heapsection[i,1]) and (NatUint(p)<=sysheap.heapsection[i,2]) then break;
@@ -402,6 +408,10 @@ var i,len,orgsize:Natuint;
     newp:Pointer;
     po1,po2:Pbyte;
 begin
+ if(p=nil) then
+  begin
+   p:=allocmem(size); exit;
+  end;
  newp:=getmem(size);
  i:=1;
  while(i<=sysheap.heapcount) do
@@ -409,7 +419,10 @@ begin
    if(NatUint(p)>=sysheap.heapsection[i,1]) and (NatUint(p)<=sysheap.heapsection[i,2]) then break;
    inc(i);
   end;
- if(i>sysheap.heapcount) then exit;
+ if(i>sysheap.heapcount) then 
+  begin
+   p:=allocmem(size); exit;
+  end;
  len:=NatUint(p)-sysheap.heapsection[i,1];
  orgsize:=sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1;
  po1:=Pbyte(sysheap.heapsection[i,1]); po2:=newp;
@@ -429,6 +442,10 @@ var p1,p2:Pchar;
 begin
  p1:=@source; p2:=@dest;
  for i:=1 to count do (p2+i-1)^:=(p1+i-1)^;
+end;
+procedure sysheap_clear_all;[public,alias:'sysheap_clear_all'];
+begin
+ sysheap.heapcount:=0; sysheap.heaprest:=maxheap;
 end;
 function strlen(str:Pchar):natuint;[public,alias:'strlen'];
 var res:natuint;
@@ -450,6 +467,7 @@ function strcmp(str1,str2:Pchar):natint;[public,alias:'strcmp'];
 var i:natint;
 begin
  i:=0;
+ if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
  while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
  if((str1+i)^>(str2+i)^) then strcmp:=1
  else if((str1+i)^<(str2+i)^) then strcmp:=-1
@@ -459,6 +477,7 @@ function Wstrcmp(str1,str2:PwideChar):natint;[public,alias:'Wstrcmp'];
 var i:natint;
 begin
  i:=0;
+ if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
  while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
  if((str1+i)^>(str2+i)^) then Wstrcmp:=1
  else if((str1+i)^<(str2+i)^) then Wstrcmp:=-1
@@ -492,7 +511,7 @@ begin
   end;
  (str+i)^:=#0;
 end;
-procedure wstrset(var str:PWideChar;val:Pwidechar);[public,alias:'wstrset'];
+procedure wstrset(var str:PWideChar;val:Pwidechar);[public,alias:'Wstrset'];
 var i:natuint;
 begin
  i:=0;
@@ -938,8 +957,8 @@ var i:byte;
     myint:natuint;
     mychar:PChar;
 begin
- mychar:=allocmem(sizeof(Char)*21);
- i:=20; myint:=uint; (mychar+20)^:=#0;
+ mychar:=allocmem(sizeof(Char)*31);
+ i:=20; myint:=uint; (mychar+30)^:=#0;
  repeat
   begin
    (mychar+i-1)^:=(numchar+myint mod 10)^;
@@ -955,8 +974,8 @@ var i:byte;
     myint:natuint;
     mychar:PWideChar;
 begin
- mychar:=allocmem(sizeof(WideChar)*21);
- i:=20; myint:=uint; (mychar+20)^:=#0;
+ mychar:=allocmem(sizeof(WideChar)*31);
+ i:=20; myint:=uint; (mychar+30)^:=#0;
  repeat
   begin
    (mychar+i-1)^:=(numchar+myint mod 10)^;
@@ -1007,9 +1026,9 @@ const numchar:Pchar='0123456789';
 var negative:boolean=false;
     procnum:natint;
     mystr:Pchar;
-    myrightnum:natint=20;
+    myrightnum:natint=30;
 begin
- procnum:=int; strinit(mystr,20);
+ procnum:=int; strinit(mystr,30);
  if(int<0) then
   begin
    procnum:=-int;
@@ -1037,9 +1056,9 @@ const numchar:PWidechar='0123456789';
 var negative:boolean=false;
     procnum:natint;
     mystr:PWidechar;
-    myrightnum:natint=20;
+    myrightnum:natint=30;
 begin
- procnum:=int; Wstrinit(mystr,20);
+ procnum:=int; Wstrinit(mystr,30);
  if(int<0) then
   begin
    procnum:=-int;

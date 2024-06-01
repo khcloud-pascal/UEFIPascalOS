@@ -3,7 +3,7 @@ library uefiinstaller;
 uses uefi,tydqfs;
 
 function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;cdecl;[public,alias:'_DLLMainCRTStartup'];
-var mystr,partstr:PWideChar;
+var mystr,mystr2,mystr3,partstr:PWideChar;
     cdindex,hdindex,emptyindex,emptynum,procnum:natuint;
     verifydata:qword;
     i,j,realsize:natuint;
@@ -12,17 +12,19 @@ var mystr,partstr:PWideChar;
     efslext:efi_file_system_list_ext;
     efp:Pefi_file_protocol;
     efsi:efi_file_system_info;
-    edl,edl2,edl3,edl4:efi_disk_list;
+    edl,edl2,edl3:efi_disk_list;
     fsh:tydqfs_header;
-    mybool:boolean;
+    mybool,havesysinfo:boolean;
+    fsi:tydqfs_system_info;
 begin
  efi_console_set_global_colour(Systemtable,efi_bck_black,efi_lightgrey);
  efi_console_clear_screen(systemtable);
  efi_console_get_max_row_and_max_column(systemtable,false);
  efi_console_enable_mouse(systemtable);
  efi_console_enable_mouse_blink(systemtable,true,500);
+ efi_set_watchdog_timer_to_null(systemtable);
  efslext:=efi_list_all_file_system_ext(systemtable);
- efi_system_restart_information_off(systemtable,mybool);
+ efi_system_restart_information_off(systemtable,mybool); havesysinfo:=false;
  if(efslext.fsrwcount=0) and (mybool=false) then
  begin
   efsl:=efi_list_all_file_system(systemtable,1);
@@ -178,24 +180,24 @@ begin
        efi_console_output_string(systemtable,UintToPWChar(realsize));
        efi_console_output_string(systemtable,#13#10);
       end;
-     efi_console_output_string(systemtable,'Do you want to format the empty disk to TYDQ File System(Y or y is yes,other is no)?'#13#10);
-     efi_console_output_string(systemtable,'Your answer:');
-     efi_console_read_string(systemtable,mystr);
-     if((WStrCmp(mystr,'Y')=0) or (WStrCmp(mystr,'y')=0)) and (WStrlen(mystr)>0) then
-      begin
-       efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
-       efi_console_read_string(systemtable,mystr);
-       emptynum:=PWCharToUint(mystr);
-       while(emptynum>edl2.disk_count) and (emptynum=0) do
-        begin
-         if(emptynum>edl2.disk_count) then
-          begin
-           efi_console_output_string(systemtable,'Error:Total Number is too large that exceed the empty disk total number.');
-          end
-         else if(emptynum=0) then
-          begin
-           efi_console_output_string(systemtable,'Error:Total Number must be larger than 0.');
-          end;
+      efi_console_output_string(systemtable,'Do you want to format the empty disk to TYDQ File System(Y or y is yes,other is no)?'#13#10);
+      efi_console_output_string(systemtable,'Your answer:');
+      efi_console_read_string(systemtable,mystr);
+      if((WStrCmp(mystr,'Y')=0) or (WStrCmp(mystr,'y')=0)) and (WStrlen(mystr)=1) then
+       begin
+        efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
+        efi_console_read_string(systemtable,mystr);
+        emptynum:=PWCharToUint(mystr);
+        while(emptynum>edl2.disk_count) and (emptynum=0) do
+         begin
+          if(emptynum>edl2.disk_count) then
+           begin
+            efi_console_output_string(systemtable,'Error:Total Number is too large that exceed the empty disk total number.');
+           end
+          else if(emptynum=0) then
+           begin
+            efi_console_output_string(systemtable,'Error:Total Number must be larger than 0.');
+           end;
          efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
          efi_console_read_string(systemtable,mystr);
          emptynum:=PWCharToUint(mystr);
@@ -229,6 +231,60 @@ begin
              efi_console_read_string(systemtable,mystr);
              efi_disk_tydq_set_fs(systemtable,emptyindex);
              tydq_fs_initialize(edl2,emptyindex,mystr);
+             if(edl3.disk_count>0) and (havesysinfo=false) then 
+              begin
+               efi_console_output_string(systemtable,'Do you want to specify this disk as system disk?'#10);
+               efi_console_output_string(systemtable,'Your answer:');
+               efi_console_read_string(systemtable,mystr);
+               if((WStrcmp(mystr,'Y')=0) or (WStrcmp(mystr,'y')=0)) and (Wstrlen(mystr)=1) then 
+                begin
+                 tydq_fs_create_systeminfo_file(systemtable,edl2,emptyindex); havesysinfo:=true;
+                 fsi:=tydq_fs_systeminfo_init(1);
+                 if(fsi.header.tydqusercount=0) then
+                  begin
+                   efi_console_output_string(systemtable,'You need a user account to enter the installed system,So you need to create a account.'#10);
+      		   efi_console_output_string(systemtable,'Do you want to create the account immediately or create it later(Y or y is yes,other is no)?'#10);
+                   efi_console_output_string(systemtable,'Your answer:');
+                   efi_console_read_string(systemtable,mystr);
+                   if((WstrCmp(mystr,'Y')=0) or (WstrCmp(mystr,'y')=0)) and (Wstrlen(mystr)=1) then
+                    begin
+                     efi_console_output_string(systemtable,'Set your account name(Name length must be in 1-128):');
+                     efi_console_read_string(systemtable,mystr);
+                   while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) do
+                    begin
+                     efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10);
+                     efi_console_output_string(systemtable,'Set your account name:');
+                     efi_console_read_string(systemtable,mystr);
+                    end;
+                   efi_console_output_string(systemtable,'Set your account password(Password length must be in 1-128):');
+                   efi_console_read_password_string(systemtable,mystr2);
+                   while(Wstrlen(mystr2)=0) or (Wstrlen(mystr2)>128) do
+                    begin
+                     efi_console_output_string(systemtable,'Error:Account password is invaild.'#10);
+                     efi_console_output_string(systemtable,'Set your account name:');
+                     efi_console_read_string(systemtable,mystr);
+                    end;
+                  efi_console_output_string(systemtable,'Verify your account password:');
+                  efi_console_read_password_string(systemtable,mystr3);
+                  while(Wstrcmp(mystr2,mystr3)<>0) or (WStrlen(mystr2)<>Wstrlen(mystr3)) do
+                   begin
+                    efi_console_output_string(systemtable,'Error:Typed password does not match your password.'#10);
+                    efi_console_output_string(systemtable,'Verify your account password:');
+                    efi_console_read_password_string(systemtable,mystr3);
+                   end;
+                   tydq_fs_systeminfo_add_user(fsi,mystr,mystr2);
+                   tydq_fs_systeminfo_write(systemtable,edl2,fsi);
+                   Wstrfree(mystr3); Wstrfree(mystr2);
+                  end;
+                  Wstrfree(mystr);
+                 end;
+                end
+               else
+                begin
+                 if(i=emptynum) then efi_console_output_string(systemtable,'You will specify the system disk later in system.'#10)
+                 else efi_console_output_string(systemtable,'You can specify an another disk to system disk.'#10);
+                end;
+              end;
             end;
           end;
         end;
@@ -239,48 +295,10 @@ begin
      efi_console_output_string(systemtable,'No disk available for TYDQ system install,installer terminated.');
      while True do;
     end;
-   freemem(edl.disk_content); freemem(edl.disk_block_content); edl.disk_count:=0;
-   edl:=efi_disk_tydq_get_fs_list(systemtable);
-   if(edl.disk_count>0) then
-    begin
-     efi_console_output_string(systemtable,'Do you want to specify the system disk in the installer stage 2(Y or y is yes,other is no)?'#13#10);
-     efi_console_output_string(systemtable,'Your answer:');
-     efi_console_read_string(systemtable,mystr);
-     if((WstrCmp(mystr,'Y')=0) or (Wstrcmp(mystr,'y')=0)) and (Wstrlen(mystr)=1) then
-      begin
-       for j:=1 to edl.disk_count do
-        begin
-         efi_console_output_string(systemtable,'Disk ');
-         partstr:=UintToPWChar(j);
-         efi_console_output_string(systemtable,partstr);
-         Wstrfree(partstr);
-         efi_console_output_string(systemtable,'-');
-         fsh:=tydq_fs_read_header(edl,j);
-         efi_console_output_string(systemtable,@fsh.RootName);
-         efi_console_output_string(systemtable,#13#10);
-        end;
-       if(edl.disk_count=1) then procnum:=1 else
-        begin
-        efi_console_output_string(systemtable,'The system disk index you want to format:');
-        efi_console_read_string(systemtable,mystr);
-        procnum:=PWCharToUint(mystr);
-        end;
-       while(procnum=0) or (procnum>edl.disk_count) do
-        begin
-         efi_console_output_string(systemtable,'Error:system disk index invaild.'#13#10);
-         efi_console_output_string(systemtable,'The disk index you want to format:');
-         efi_console_read_string(systemtable,mystr);
-         procnum:=PWCharToUint(mystr);
-        end;
-       tydq_fs_create_systeminfo_file(systemtable,edl,procnum);
-      end
-     else
-      begin
-       efi_console_output_string(systemtable,'You will specify the system disk later in the main program.'#13#10);
-      end;
-     Wstrfree(mystr);
-    end;
+   freemem(edl3.disk_block_content); freemem(edl3.disk_content); edl3.disk_count:=0;
+   freemem(edl2.disk_block_content); freemem(edl2.disk_content); edl2.disk_count:=0;
    freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
+   Wstrfree(mystr3); Wstrfree(mystr2); Wstrfree(mystr); sysheap_clear_all;
    efi_console_output_string(systemtable,'Stage 2 Install done!Now you can restart your installer to enter the system!'#13#10);
    SystemTable^.RuntimeServices^.ResetSystem(EfiResetWarm,efi_success,0,nil);
   end
@@ -354,9 +372,9 @@ begin
      efi_console_read_string(systemtable,mystr);
      if((WStrCmp(mystr,'Y')=0) or (WStrCmp(mystr,'y')=0)) and (Wstrlen(mystr)>0) then
       begin
-       efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
-       efi_console_read_string(systemtable,mystr);
-       emptynum:=PWCharToUint(mystr);
+        efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
+        efi_console_read_string(systemtable,mystr);
+        emptynum:=PWCharToUint(mystr);
        while(emptynum>edl2.disk_count) do
         begin
          if(emptynum>edl2.disk_count) then
@@ -414,6 +432,60 @@ begin
               end;
              efi_disk_tydq_set_fs(systemtable,emptyindex);
              tydq_fs_initialize(edl2,emptyindex,mystr);
+             if(edl3.disk_count>0) and (havesysinfo=false) then 
+              begin
+               efi_console_output_string(systemtable,'Do you want to specify this disk as system disk?'#10);
+               efi_console_output_string(systemtable,'Your answer:');
+               efi_console_read_string(systemtable,mystr);
+               if((WStrcmp(mystr,'Y')=0) or (WStrcmp(mystr,'y')=0)) and (Wstrlen(mystr)=1) then 
+                begin
+                 tydq_fs_create_systeminfo_file(systemtable,edl2,emptyindex); havesysinfo:=true;
+                 fsi:=tydq_fs_systeminfo_init(1);
+                 if(fsi.header.tydqusercount=0) then
+                  begin
+                   efi_console_output_string(systemtable,'You need a user account to enter the installed system,So you need to create a account.'#10);
+      		   efi_console_output_string(systemtable,'Do you want to create the account immediately or create it later(Y or y is yes,other is no)?'#10);
+                   efi_console_output_string(systemtable,'Your answer:');
+                   efi_console_read_string(systemtable,mystr);
+                   if((WstrCmp(mystr,'Y')=0) or (WstrCmp(mystr,'y')=0)) and (Wstrlen(mystr)=1) then
+                    begin
+                     efi_console_output_string(systemtable,'Set your account name(Name length must be in 1-128):');
+                     efi_console_read_string(systemtable,mystr);
+                   while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) do
+                    begin
+                     efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10);
+                     efi_console_output_string(systemtable,'Set your account name:');
+                     efi_console_read_string(systemtable,mystr);
+                    end;
+                   efi_console_output_string(systemtable,'Set your account password(Password length must be in 1-128):');
+                   efi_console_read_password_string(systemtable,mystr2);
+                   while(Wstrlen(mystr2)=0) or (Wstrlen(mystr2)>128) do
+                    begin
+                     efi_console_output_string(systemtable,'Error:Account password is invaild.'#10);
+                     efi_console_output_string(systemtable,'Set your account name:');
+                     efi_console_read_string(systemtable,mystr);
+                    end;
+                  efi_console_output_string(systemtable,'Verify your account password:');
+                  efi_console_read_password_string(systemtable,mystr3);
+                  while(Wstrcmp(mystr2,mystr3)<>0) or (WStrlen(mystr2)<>Wstrlen(mystr3)) do
+                   begin
+                    efi_console_output_string(systemtable,'Error:Typed password does not match your password.'#10);
+                    efi_console_output_string(systemtable,'Verify your account password:');
+                    efi_console_read_password_string(systemtable,mystr3);
+                   end;
+                   tydq_fs_systeminfo_add_user(fsi,mystr,mystr2);
+                   tydq_fs_systeminfo_write(systemtable,edl2,fsi);
+                   Wstrfree(mystr3); Wstrfree(mystr2);
+                  end;
+                  Wstrfree(mystr);
+                 end;
+                end
+               else
+                begin
+                 if(i=emptynum) then efi_console_output_string(systemtable,'You will specify the system disk later in system.'#10)
+                 else efi_console_output_string(systemtable,'You can specify an another disk to system disk.'#10);
+                end;
+              end;
             end;
           end;
         end;
@@ -424,48 +496,10 @@ begin
      efi_console_output_string(systemtable,'No disk available for TYDQ system install,installer terminated.');
      while True do;
     end;
-    freemem(edl.disk_content); freemem(edl.disk_block_content); edl.disk_count:=0;
-    edl:=efi_disk_tydq_get_fs_list(systemtable);
-    if(edl.disk_count>0) then
-     begin
-      efi_console_output_string(systemtable,'Do you want to specify the system disk in the installer stage 2(Y or y is yes,other is no)?'#13#10);
-      efi_console_output_string(systemtable,'Your answer:');
-      efi_console_read_string(systemtable,mystr);
-      if((WstrCmp(mystr,'Y')=0) or (Wstrcmp(mystr,'y')=0)) and (Wstrlen(mystr)=1) then
-      begin
-       for j:=1 to edl.disk_count do
-        begin
-         efi_console_output_string(systemtable,'Disk ');
-         partstr:=UintToPWChar(j);
-         efi_console_output_string(systemtable,partstr);
-         Wstrfree(partstr);
-         efi_console_output_string(systemtable,'-');
-         fsh:=tydq_fs_read_header(edl,j);
-         efi_console_output_string(systemtable,@fsh.RootName);
-         efi_console_output_string(systemtable,#13#10);
-         end;
-       if(edl.disk_count=1) then procnum:=1 else
-        begin
-         efi_console_output_string(systemtable,'The system disk index you want to format:');
-         efi_console_read_string(systemtable,mystr);
-         procnum:=PWCharToUint(mystr);
-        end;
-       while(procnum=0) or (procnum>edl.disk_count) do
-        begin
-         efi_console_output_string(systemtable,'Error:system disk index invaild.'#13#10);
-         efi_console_output_string(systemtable,'The disk index you want to format:');
-         efi_console_read_string(systemtable,mystr);
-         procnum:=PWCharToUint(mystr);
-        end;
-       tydq_fs_create_systeminfo_file(systemtable,edl,procnum);
-      end
-     else
-      begin
-       efi_console_output_string(systemtable,'You will specify the system disk later in the main program.'#13#10);
-      end;
-     Wstrfree(mystr);
-    end;
-   freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
+    freemem(edl3.disk_block_content); freemem(edl3.disk_content); edl3.disk_count:=0;
+    freemem(edl2.disk_block_content); freemem(edl2.disk_content); edl2.disk_count:=0;
+    freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
+    freemem(mystr3); freemem(mystr2); freemem(mystr); sysheap_clear_all;
    efi_console_output_string(systemtable,'Stage 2 Install done!Now you can restart your installer to enter the system!'#13#10);
    SystemTable^.RuntimeServices^.ResetSystem(EfiResetWarm,efi_success,0,nil);
   end;
