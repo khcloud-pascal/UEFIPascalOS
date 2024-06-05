@@ -120,6 +120,7 @@ procedure fpc_libinitializeunits;compilerproc;
 procedure fpc_initializeunits;compilerproc;
 procedure fpc_finalizeunits;compilerproc;
 procedure fpc_do_exit;compilerproc;
+procedure fpc_div_by_zero;compilerproc;
 function sys_getmem(size:natuint):Pointer;compilerproc;
 procedure sys_freemem(var p:pointer);compilerproc;
 function sys_allocmem(size:natuint):Pointer;compilerproc;
@@ -190,12 +191,12 @@ function PCharToPWChar(orgstr:PChar):PWideChar;
 function PWCharToPChar(orgstr:PWideChar):PChar;
 function Neighborlinegenerate(originalstr,linestr:PWideChar;row:natuint;mcolumn:natuint):neighborline;
 function TotalLineList(originalstr,linefeed:PWideChar;mcolumn:natuint):linelist;
+procedure DelayInSeconds(delaysecond:natuint);
 
 var compheap,sysheap:systemheap;
 implementation
 procedure fpc_handleerror;compilerproc;[public,alias:'FPC_HANDLEERROR'];
 begin
- while (True) do;
 end;
 procedure fpc_lib_exit;compilerproc;[public,alias:'FPC_LIB_EXIT'];
 begin
@@ -210,6 +211,9 @@ procedure fpc_finalizeunits;compilerproc;[public,alias:'FPC_FINALIZEUNITS'];
 begin
 end;
 procedure fpc_do_exit;compilerproc;[public,alias:'FPC_DI_EXIT'];
+begin
+end;
+procedure fpc_div_by_zero;compilerproc;[public,alias:'FPC_DIVBYZERO'];
 begin
 end;
 procedure compheap_delete_item(p:pointer);
@@ -1461,6 +1465,12 @@ begin
    if(pos2>0) then pos1:=pos2+mylen2 else break;
   end;
  TotalLineList:=res;
+end;
+procedure DelayInSeconds(delaysecond:natuint);[public,alias:'DelayInSeconds'];
+var i,len:natuint;
+begin
+ len:=UintPower(10,6)*delaysecond;
+ for i:=1 to len do;
 end;
 begin
  compheap.heapcount:=0; compheap.heaprest:=maxheap;

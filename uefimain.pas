@@ -300,7 +300,7 @@ begin
  WStrset(tydqcurrentdiskname,@fsh.RootName);
  WStrSet(tydqcurrentpath,'/');
  efi_console_output_string(systemtable,'Wait for 10 seconds to enter TYDQ system!'#10);
- SystemTable^.BootServices^.Stall(10000);
+ DelayInSeconds(10);
  efi_console_clear_screen(systemtable);
  efi_console_output_string(systemtable,'Type the commands to operate the TYDQ System(-h or --help for help!)'#13#10);
  freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
