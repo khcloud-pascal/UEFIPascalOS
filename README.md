@@ -1,6 +1,6 @@
 Files in my repository:  
-build.sh:  
-build the iso file for bare machine or qemu virtual machine.You can run bash build.sh to build the iso.  
+buildx64.sh and buildaarch64.sh and buildloongarch64.sh:  
+build the iso file for corresponding architecture bare machine or qemu virtual machine. 
 others:  
 source code (free pascal)  
 How to build the iso:  
