@@ -81,7 +81,8 @@ begin
    else if(partlen=0) and ((cmdstr+i-1)^='"') then isstring:=true
    else if(partlen>0) and ((cmdstr+i-1)^=#39) then isstring:=false
    else if(partlen>0) and ((cmdstr+i-1)^='"') then isstring:=false;
-   if((partlen=0) and ((cmdstr+i-1)^<>' ') and (partstart=0)) or (isstring=true) then
+   if(i=len) and (isstring=true) then isstring:=false;
+   if(partlen=0) and ((cmdstr+i-1)^<>' ') and (partstart=0) then
     begin
      partstart:=i; inc(partlen);
     end
@@ -100,7 +101,7 @@ begin
      partstart:=0;
      partlen:=0;
     end
-   else if(partstart>0) then
+   else if(partstart>0) or (isstring=true) then
     begin
      inc(partlen);
     end;
@@ -207,6 +208,13 @@ begin
      else if(partstr2^='s') then
       begin
        procnum:=PWCharToUint(partstr);
+      end
+     else
+      begin
+       efi_console_output_string(systemtable,'The specified time unit must be h(hour) or m(minute) or s(second),not other units!'#10);
+       Wstrfree(partstr2);
+       Wstrfree(partstr);
+       exit;
       end;
      SystemTable^.BootServices^.Stall(procnum*1000);
      Wstrfree(partstr2);
@@ -917,7 +925,7 @@ begin
      if(WStrcmp((cpstr.partstrlist+2)^,'..')=0) and (Wstrlen((cpstr.partstrlist+2)^)=2) then
       begin
        procnum:=Wstrposdir(tydqcurrentpath,'/',Wstrlen(tydqcurrentpath),-1);
-       if(procnum>1) then partstr:=Wstrcutout(tydqcurrentpath,1,procnum-1);
+       if(procnum>1) then partstr:=Wstrcutout(tydqcurrentpath,1,procnum-1) else partstr:=Wstrcopy(tydqcurrentpath,1,1);
        Wstrset(tydqcurrentpath,partstr);
        Wstrfree(partstr);
       end
@@ -1059,6 +1067,19 @@ begin
     begin
      efi_console_output_string(systemtable,'Coming Soon!'#10);
     end
+   else if(Wstrcmp((cpstr.partstrlist+1)^,'sysver')=0) and (WStrlen((cpstr.partstrlist+1)^)=6) then
+    begin
+     efi_console_output_string(systemtable,'System Version:0.0.2'#10);
+    end
+   else if(WStrcmp((cpstr.partstrlist+1)^,'sysname')=0) and (Wstrlen((cpstr.partstrlist+1)^)=7) then
+    begin
+     efi_console_output_string(systemtable,'System Name:TYDQ System'#10);
+    end
+   else if(WStrcmp((cpstr.partstrlist+1)^,'sysinfo')=0) and (Wstrlen((cpstr.partstrlist+1)^)=7) then
+    begin
+     efi_console_output_string(systemtable,'System Name:TYDQ System'#10);
+     efi_console_output_string(systemtable,'System Version:0.0.2'#10);
+    end
    else if(cpstr.partstrnum>=2) then
     begin
      efi_console_output_string(systemtable,'Command ');
@@ -1122,9 +1143,9 @@ begin
     end
    else if(Wstrcmp(cpstr.partstrlist^,'delay')=0) and (Wstrlen(cpstr.partstrlist^)=5) then
     begin
-     if(cpstr.partstrnum<>3) then
+     if(cpstr.partstrnum<>2) then
       begin
-       efi_console_output_string(systemtable,'delay must have one parameter!'#10);
+       efi_console_output_string(systemtable,'delay must have only one parameter!'#10);
        for i:=cpstr.partstrnum downto 1 do
         begin
          Wstrfree((cpstr.partstrlist+i-1)^);
@@ -1133,7 +1154,7 @@ begin
        exit;
       end;
      partstr:=Wstrcutout((cpstr.partstrlist+1)^,sysindex,Wstrlen((cpstr.partstrlist+1)^)-1);
-     partstr2:=Wstrcopy((cpstr.partstrlist+1)^,Wstrlen((cpstr.partstrlist+1)^),sysindex);
+     partstr2:=Wstrcopy((cpstr.partstrlist+1)^,Wstrlen((cpstr.partstrlist+1)^),1);
      if(Wstrlen(partstr2)>1) then
       begin
        efi_console_output_string(systemtable,'The specified time unit must be h(hour) or m(minute) or s(second),not other units!'#10);
@@ -1167,6 +1188,13 @@ begin
      else if(partstr2^='s') then
       begin
        procnum:=PWCharToUint(partstr);
+      end
+     else
+      begin
+       efi_console_output_string(systemtable,'The specified time unit must be h(hour) or m(minute) or s(second),not other units!'#10);
+       Wstrfree(partstr2);
+       Wstrfree(partstr);
+       exit;
       end;
      SystemTable^.BootServices^.Stall(procnum*1000);
      Wstrfree(partstr2);
@@ -1873,7 +1901,7 @@ begin
      if(WStrcmp((cpstr.partstrlist+1)^,'..')=0) and (Wstrlen((cpstr.partstrlist+1)^)=2) then
       begin
        procnum:=Wstrposdir(tydqcurrentpath,'/',Wstrlen(tydqcurrentpath),-1);
-       if(procnum>1) then partstr:=Wstrcutout(tydqcurrentpath,1,procnum-1);
+       if(procnum>1) then partstr:=Wstrcutout(tydqcurrentpath,1,procnum-1) else partstr:=Wstrcopy(tydqcurrentpath,1,1);
        Wstrset(tydqcurrentpath,partstr);
        Wstrfree(partstr);
       end
@@ -1917,6 +1945,19 @@ begin
       end;
      tydq_fs_systeminfo_write(systemtable,edl,sysinfo);
      efi_console_output_string(systemtable,'Successfully login!'#10);
+    end
+   else if(Wstrcmp(cpstr.partstrlist^,'sysver')=0) and (WStrlen(cpstr.partstrlist^)=6) then
+    begin
+     efi_console_output_string(systemtable,'System Version:0.0.2'#10);
+    end
+   else if(WStrcmp(cpstr.partstrlist^,'sysname')=0) and (Wstrlen(cpstr.partstrlist^)=7) then
+    begin
+     efi_console_output_string(systemtable,'System Name:TYDQ System'#10);
+    end
+   else if(WStrcmp(cpstr.partstrlist^,'sysinfo')=0) and (Wstrlen(cpstr.partstrlist^)=7) then
+    begin
+     efi_console_output_string(systemtable,'System Name:TYDQ System'#10);
+     efi_console_output_string(systemtable,'System Version:0.0.2'#10);
     end
    else if(Wstrcmp(cpstr.partstrlist^,'help')=0) and (WStrlen(cpstr.partstrlist^)=4) then
     begin
