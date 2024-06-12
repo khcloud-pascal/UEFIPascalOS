@@ -5,10 +5,10 @@ unit system;
 interface
 
 {$IFDEF CPU32}
-const maxheap=16777216*8;
+const maxheap=16777216*12;
       maxsection=16384*64;
 {$ELSE CPU32}
-const maxheap=67108864*8;
+const maxheap=67108864*12;
       maxsection=65536*64;
 {$ENDIF CPU32}
 type
@@ -112,6 +112,18 @@ type
            lineright:^natuint;
            linecount:natuint;
            end;
+  maskwildcard=record
+               liststr:^PChar;
+               listpos:^natuint;
+               listlen:^natuint;
+               listcount:natuint;
+               end;
+  Wmaskwildcard=record
+               liststr:^PWideChar;
+               listpos:^natuint;
+               listlen:^natuint;
+               listcount:natuint;
+               end;
 const mypwd:PChar='PHjueigbEYywLCQiCYRQGleDMUjOceLMBFDMJHEMUzgCleRgkKEnAuVLtSAEFSFhevpEKomPHIbaqxLLGJVMRmZUDFKnvHGfvTwYEOqVaBxEGXMXXuITZixUcMbdTCfWIwysKPSciOnUHgmePRWEWWcNMuePEbGOvNgNbqdMMRlzbocTikuCuQuISgQTWFtVSLUmAObgipXAnNEdUNXKVFBiNTIOornretCNOaEwhQTdIRlYaldWzFiummYKKJJcnDRJovDJTFXpQczJQBDnATyvopuBakmGKXTDsIhKfKNITJlsDkLTlKRKfObLvwpIgXvqmBmiWLKQlhqMyAcUoFxkFNPYeGFCduhGJTNtSMfvbGuupWzugWNrwwZKkwjfIqIdjXMAiVONPcMebzSCvUGtVblwohLzOhlnPKIQBTxpBYufIJesKHeZPUHiYaofkTEDcpRapVwluKFARevxkgjxuEFHgVEuQtAUFMMTszCgrqcuKFnJiZtmDBmYsatb';
 mypwdoffset:array[1..24] of shortint=(-1,-3,-6,-8,-7,-4,-5,-2,0,8,9,10,12,2,3,4,1,9,-9,3,-11,-12,10,-7);
 procedure fpc_handleerror;compilerproc;
@@ -189,9 +201,14 @@ function Passwd_decrypt_to_PChar(passwdstr:PChar):PChar;
 function Passwd_decrypt_to_PWChar(passwdstr:PChar):PWideChar;
 function PCharToPWChar(orgstr:PChar):PWideChar;
 function PWCharToPChar(orgstr:PWideChar):PChar;
+function PCharIsInt(str:PChar):boolean;
+function PWCharIsInt(str:PWideChar):boolean;
+function PCharMatchMask(orgstr,maskstr:PChar):boolean;
+function PWCharMatchMask(orgstr,maskstr:PWideChar):boolean;
+function PCharGetWildcard(orgstr,maskstr:PChar):maskwildcard;
+function PWCharGetWildcard(orgstr,maskstr:PWideChar):Wmaskwildcard;
 function Neighborlinegenerate(originalstr,linestr:PWideChar;row:natuint;mcolumn:natuint):neighborline;
 function TotalLineList(originalstr,linefeed:PWideChar;mcolumn:natuint):linelist;
-procedure DelayInSeconds(delaysecond:natuint);
 
 var compheap,sysheap:systemheap;
 implementation
@@ -412,11 +429,11 @@ var i,len,orgsize:Natuint;
     newp:Pointer;
     po1,po2:Pbyte;
 begin
- if(p=nil) then
-  begin
-   p:=allocmem(size); exit;
-  end;
  newp:=getmem(size);
+ if(p=nil) then
+  begin 
+   p:=newp; exit;
+  end;
  i:=1;
  while(i<=sysheap.heapcount) do
   begin
@@ -425,7 +442,7 @@ begin
   end;
  if(i>sysheap.heapcount) then 
   begin
-   p:=allocmem(size); exit;
+   p:=newp; exit;
   end;
  len:=NatUint(p)-sysheap.heapsection[i,1];
  orgsize:=sysheap.heapsection[i,2]-sysheap.heapsection[i,1]+1;
@@ -1346,6 +1363,242 @@ begin
    end;
   PWCharToPChar:=res;
 end;
+function PCharIsInt(str:PChar):boolean;[public,alias:'PCharIsInt'];
+const numchar:PChar='0123456789';
+var i,j,len:natuint;
+begin
+ len:=strlen(str);
+ for i:=1 to len do
+  begin
+   j:=0;
+   while(j<=9) do if((str+i-1)^=(numchar+j)^) then break else inc(j);
+   if(j>9) then break;
+  end;
+ if(j>9) then PCharIsInt:=false else PCharIsInt:=true;
+end;
+function PWCharIsInt(str:PWideChar):boolean;[public,alias:'PWCharIsInt'];
+const numchar:PWideChar='0123456789';
+var i,j,len:natuint;
+begin
+ len:=Wstrlen(str);
+ for i:=1 to len do
+  begin
+   j:=0;
+   while(j<=9) do if((str+i-1)^=(numchar+j)^) then break else inc(j);
+   if(j>9) then break;
+  end;
+ if(j>9) then PWCharIsInt:=false else PWCharIsInt:=true;
+end;
+function PCharMatchMask(orgstr,maskstr:PChar):boolean;[public,alias:'PCharMatchMask'];
+var i,j,k,len1,len2:natuint;
+begin
+ len1:=strlen(orgstr); len2:=strlen(maskstr); i:=1; j:=1;
+ while(i<=len1) and (j<=len2) do
+  begin
+   if((maskstr+j-1)^='*') then
+    begin
+     if((maskstr+j)^='*') then
+      begin
+       inc(j); inc(i);
+      end
+     else
+      begin
+       k:=i+1;
+       while(k<=len1) do
+        begin
+         if((maskstr+j)^=(orgstr+k-1)^) then break;
+         inc(k);
+        end;
+       if(k>len1) then break else
+        begin
+         i:=k; inc(j);
+        end;
+      end;
+    end
+   else if((maskstr+j-1)^='?') then
+    begin
+     inc(j); inc(i);
+    end
+   else if((maskstr+j-1)^=(orgstr+i-1)^) then
+    begin
+     inc(j); inc(i);
+    end
+   else break;
+  end;
+ if(i<=len1) and (j<=len2) then PCharMatchMask:=false else PCharMatchMask:=true;
+end;
+function PWCharMatchMask(orgstr,maskstr:PWideChar):boolean;[public,alias:'PWCharMatchMask'];
+var i,j,k,len1,len2:natuint;
+begin
+ len1:=Wstrlen(orgstr); len2:=Wstrlen(maskstr); i:=1; j:=1;
+ while(i<=len1) and (j<=len2) do
+  begin
+   if((maskstr+j-1)^='*') then
+    begin
+     if((maskstr+j)^='*') then
+      begin
+       inc(j); inc(i);
+      end
+     else
+      begin
+       k:=i+1;
+       while(k<=len1) do
+        begin
+         if((maskstr+j)^=(orgstr+k-1)^) then break;
+         inc(k);
+        end;
+       if(k>len1) then break else
+        begin
+         i:=k; inc(j);
+        end;
+      end;
+    end
+   else if((maskstr+j-1)^='?') then
+    begin
+     inc(j); inc(i);
+    end
+   else if((maskstr+j-1)^=(orgstr+i-1)^) then
+    begin
+     inc(j); inc(i);
+    end
+   else break;
+  end;
+ if(i<=len1) and (j<=len2) then PWCharMatchMask:=false else PWCharMatchMask:=true;
+end;
+function PCharGetWildcard(orgstr,maskstr:PChar):maskwildcard;[public,alias:'PCharGetWildcard'];
+var res:maskwildcard;
+    i,j,k,m,len1,len2,spos,slen,size:natuint;
+begin
+ res.liststr:=nil; res.listcount:=0;
+ len1:=strlen(orgstr); len2:=strlen(maskstr); i:=1; j:=1;
+ while(i<=len1) and (j<=len2) do
+  begin
+   if((maskstr+j-1)^='*') then
+    begin
+     inc(res.listcount);
+     size:=getmemsize(res.liststr);
+     ReallocMem(res.liststr,sizeof(PChar)*res.listcount);
+     res.listlen:=Pointer(Pointer(res.listlen)-size);
+     size:=size+getmemsize(res.listlen);
+     ReallocMem(res.listlen,sizeof(natuint)*res.listcount);
+     res.listpos:=Pointer(Pointer(res.listpos)-size);
+     size:=size+getmemsize(res.listpos);
+     ReallocMem(res.listpos,sizeof(natuint)*res.listcount);
+     for m:=1 to res.listcount-1 do (res.liststr+m-1)^:=PChar(Pointer((res.liststr+m-1)^)-size);
+     k:=j+1; spos:=i; slen:=0;
+     while((maskstr+k-1)^='*') do inc(k);
+     while((orgstr+spos+slen-1)^<>(maskstr+k-1)^) and (spos+slen<=len1) do inc(slen);
+     if(k>len1) then
+      begin
+       dec(res.listcount);
+       size:=getmemsize(res.liststr);
+       ReallocMem(res.liststr,sizeof(PChar)*res.listcount);
+       for m:=1 to res.listcount do (res.liststr+m-1)^:=PChar(Pointer((res.liststr+m-1)^)-size);
+       break;
+      end;
+     (res.liststr+res.listcount-1)^:=strcopy(orgstr,spos,slen);
+     (res.listlen+res.listcount-1)^:=spos;
+     (res.listpos+res.listcount-1)^:=k-j;
+     i:=spos+slen; j:=k;
+    end
+   else if((maskstr+j-1)^='?') then
+    begin
+     inc(res.listcount);
+     size:=getmemsize(res.liststr);
+     ReallocMem(res.liststr,sizeof(PChar)*res.listcount);
+     res.listlen:=Pointer(Pointer(res.listlen)-size);
+     size:=size+getmemsize(res.listlen);
+     ReallocMem(res.listlen,sizeof(natuint)*res.listcount);
+     res.listpos:=Pointer(Pointer(res.listpos)-size);
+     size:=size+getmemsize(res.listpos);
+     ReallocMem(res.listpos,sizeof(natuint)*res.listcount);
+     for m:=1 to res.listcount-1 do (res.liststr+m-1)^:=PChar(Pointer((res.liststr+m-1)^)-size);
+     k:=j+1; spos:=i; slen:=1;
+     while((maskstr+k+slen-1)^='?') do inc(slen);
+     (res.liststr+res.listcount-1)^:=strcopy(orgstr,spos,slen);
+     (res.listlen+res.listcount-1)^:=spos;
+     (res.listpos+res.listcount-1)^:=slen;
+     i:=spos+slen; j:=k;
+    end
+   else if((maskstr+j-1)^=(orgstr+i-1)^) then
+    begin
+     inc(i); inc(j);
+    end
+   else break;
+  end;
+ if(i<=len1) and (j<=len2) then
+  begin
+   res.liststr:=nil; res.listcount:=0;
+  end;
+ PCharGetWildCard:=res;
+end;
+function PWCharGetWildcard(orgstr,maskstr:PWideChar):Wmaskwildcard;[public,alias:'PWCharGetWildcard'];
+var res:Wmaskwildcard;
+    i,j,k,m,len1,len2,spos,slen,size,size2:natuint;
+begin
+ res.liststr:=nil; res.listcount:=0;
+ len1:=Wstrlen(orgstr); len2:=Wstrlen(maskstr); i:=1; j:=1;
+ while(i<=len1) and (j<=len2) do
+  begin
+   if((maskstr+j-1)^='*') then
+    begin
+     inc(res.listcount);
+     size:=getmemsize(res.liststr);
+     ReallocMem(res.liststr,sizeof(PWideChar)*res.listcount);
+     res.listlen:=Pointer(Pointer(res.listlen)-size);
+     size:=size+getmemsize(res.listlen);
+     ReallocMem(res.listlen,sizeof(natuint)*res.listcount);
+     res.listpos:=Pointer(Pointer(res.listpos)-size);
+     size:=size+getmemsize(res.listpos);
+     ReallocMem(res.listpos,sizeof(natuint)*res.listcount);
+     for m:=1 to res.listcount-1 do (res.liststr+m-1)^:=PWideChar(Pointer((res.liststr+m-1)^)-size);
+     k:=j+1; spos:=i; slen:=0;
+     while((maskstr+k-1)^='*') do inc(k);
+     while((orgstr+spos+slen-1)^<>(maskstr+k-1)^) and (spos+slen<=len1) do inc(slen);
+     if(k>len1) then
+      begin
+       dec(res.listcount);
+       size:=getmemsize(res.liststr);
+       ReallocMem(res.liststr,sizeof(PWideChar)*res.listcount);
+       for m:=1 to res.listcount do (res.liststr+m-1)^:=PWideChar(Pointer((res.liststr+m-1)^)-size);
+       break;
+      end;
+     (res.liststr+res.listcount-1)^:=Wstrcopy(orgstr,spos,slen);
+     (res.listlen+res.listcount-1)^:=spos;
+     (res.listpos+res.listcount-1)^:=k-j;
+     i:=spos+slen; j:=k;
+    end
+   else if((maskstr+j-1)^='?') then
+    begin
+     inc(res.listcount);
+     size:=getmemsize(res.liststr);
+     ReallocMem(res.liststr,sizeof(PWideChar)*res.listcount);
+     res.listlen:=Pointer(Pointer(res.listlen)-size);
+     size:=size+getmemsize(res.listlen);
+     ReallocMem(res.listlen,sizeof(natuint)*res.listcount);
+     res.listpos:=Pointer(Pointer(res.listpos)-size);
+     size:=size+getmemsize(res.listpos);
+     ReallocMem(res.listpos,sizeof(natuint)*res.listcount);
+     for m:=1 to res.listcount-1 do (res.liststr+m-1)^:=PWideChar(Pointer((res.liststr+m-1)^)-size);
+     k:=j+1; spos:=i; slen:=1;
+     while((maskstr+k+slen-1)^='?') do inc(slen);
+     (res.liststr+res.listcount-1)^:=Wstrcopy(orgstr,spos,slen);
+     (res.listlen+res.listcount-1)^:=spos;
+     (res.listpos+res.listcount-1)^:=slen;
+     i:=spos+slen; j:=k;
+    end
+   else if((maskstr+j-1)^=(orgstr+i-1)^) then
+    begin
+     inc(i); inc(j);
+    end
+   else break;
+  end;
+ if(i<=len1) and (j<=len2) then
+  begin
+   res.liststr:=nil; res.listcount:=0;
+  end;
+ PWCharGetWildCard:=res;
+end;                                      
 function Neighborlinegenerate(originalstr,linestr:PWideChar;row:natuint;mcolumn:natuint):neighborline;[public,alias:'Neighborlinegenerate'];
 var res:neighborline;
     mypos,mylen:^natuint;
@@ -1465,12 +1718,6 @@ begin
    if(pos2>0) then pos1:=pos2+mylen2 else break;
   end;
  TotalLineList:=res;
-end;
-procedure DelayInSeconds(delaysecond:natuint);[public,alias:'DelayInSeconds'];
-var i,len:natuint;
-begin
- len:=UintPower(10,6)*delaysecond;
- for i:=1 to len do;
 end;
 begin
  compheap.heapcount:=0; compheap.heaprest:=maxheap;

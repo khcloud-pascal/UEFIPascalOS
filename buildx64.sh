@@ -19,7 +19,7 @@
 	mcopy -i fat.img kernel/*.efi ::/EFI/SETUP
 	mkdir iso
 	cp fat.img iso
-	xorriso -as mkisofs -R -f -e fat.img -no-emul-boot -o cdimage.iso iso
+	xorriso -as mkisofs -R -f -e fat.img -no-emul-boot -o cdimagex64.iso iso
 	rm -rf iso
 	rm -rf *.ppu
 	rm -rf fat.img

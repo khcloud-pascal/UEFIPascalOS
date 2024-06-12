@@ -56,6 +56,7 @@ type tydqfs_time=packed record
      tydqfs_user_info=packed record
                       username:PWideChar;
                       userpasswd:PWideChar;
+                      usermanager:boolean;
                       end; 
      tydqfs_system_info=packed record
                         header:tydqfs_system_header;
@@ -71,28 +72,28 @@ const tydqfs_signature:qword=$5D47291AD7E3F2B1;
       tydqfs_text_file:byte=$20;
       tydqfs_binary_file:byte=$40;
       tydqfs_executable_file:byte=$80;
-      tydqfilemode_create:byte=$01;
-      tydqfilemode_write:byte=$02;
-      tydqfilemode_read:byte=$04;
-      tydqfilemode_delete:byte=$08;
-      tydqfs_search_start:natuint=0;
       userlevel_system:byte=$00;
       userlevel_user:byte=$01;
       userlevel_application:byte=$02;
       
 function tydq_fs_byte_to_attribute_bool(attr:byte):tydqfs_attribute_bool;      
 function tydq_combine_path_and_filename(path:PWideChar;filename:PWideChar):PWideChar;
+procedure tydq_diskname_and_path_initialize;
+function tydq_time_to_string(orgtime:tydqfs_time):PWideChar;
+function tydq_fs_locate_diskindex(edl:efi_disk_list;path:PWideChar):natuint;
+function tydq_fs_locate_fullpath(edl:efi_disk_list;path:PWideChar):PWideChar;
 function tydq_fs_filelist_combine(filelist1,filelist2:tydqfs_file_list):tydqfs_file_list;
 procedure tydq_fs_initialize(edl:efi_disk_list;diskindex:natuint;RootName:PWideChar);
 function tydq_fs_read_header(edl:efi_disk_list;diskindex:natuint):tydqfs_header;
 procedure tydq_fs_write_header(edl:efi_disk_list;diskindex:natuint;fsh:tydqfs_header);
 function tydq_fs_disk_exists(edl:efi_disk_list;diskname:PWideChar):boolean;
 function tydq_fs_disk_index(edl:efi_disk_list;diskname:PWideChar):natuint;
+function tydq_fs_disk_name(edl:efi_disk_list;index:natuint):PWideChar;
 function tydq_fs_disk_is_formatted(edl:efi_disk_list;diskindex:natuint):boolean;
 function tydq_fs_file_exists(edl:efi_disk_list;diskindex:natuint;filename:PWideChar):boolean;
 function tydq_fs_file_position(edl:efi_disk_list;diskindex:natuint;filename:PWideChar):natuint;
 procedure tydq_fs_create_file(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;attr:byte;userlevel:byte;belonguserindex:qword);
-function tydq_fs_list_file(edl:efi_disk_list;diskindex:natuint;path:PWideChar;detecthidden:boolean;belonguserindex:qword):tydqfs_file_list;
+function tydq_fs_list_file(edl:efi_disk_list;diskindex:natuint;path:PWideChar;expanded:boolean;detecthidden:boolean;belonguserindex:qword):tydqfs_file_list;
 function tydq_fs_delete_file(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:qword):byte;
 function tydq_fs_file_read(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;position,readlength:natuint;userlevel:byte;belonguserindex:qword):tydqfs_data;
 function tydq_fs_file_info(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:qword):tydqfs_file;
@@ -103,10 +104,14 @@ procedure tydq_fs_create_systeminfo_file(systemtable:Pefi_system_table;edl:efi_d
 function tydq_fs_systeminfo_read(systemtable:Pefi_system_table;edl:efi_disk_list):tydqfs_system_info;
 procedure tydq_fs_systeminfo_write(systemtable:Pefi_system_table;edl:efi_disk_list;writeinfo:tydqfs_system_info);
 function tydq_fs_systeminfo_disk_index(systemtable:Pefi_system_table;edl:efi_disk_list):natuint;
-procedure tydq_fs_systeminfo_add_user(var sysinfo:tydqfs_system_info;newusername,newuserpasswd:PWideChar);
+procedure tydq_fs_systeminfo_add_user(var sysinfo:tydqfs_system_info;newusername,newuserpasswd:PWideChar;Manager:boolean);
 procedure tydq_fs_systeminfo_delete_user(var sysinfo:tydqfs_system_info;username:PWideChar);
 function tydq_fs_systeminfo_get_passwd(sysinfo:tydqfs_system_info;username:PWideChar):PWideChar;
 function tydq_fs_systeminfo_get_index(sysinfo:tydqfs_system_info;username:PWideChar):natuint;
+function tydq_fs_systeminfo_get_manager_index(sysinfo:tydqfs_system_info):natuint;
+function tydq_fs_systeminfo_username_count(sysinfo:tydqfs_system_info;username:PWideChar):natuint;
+procedure tydq_fs_systeminfo_free(var sysinfo:tydqfs_system_info);
+function tydq_fs_legal_filename(filename:PWideChar):boolean;
 
 var tydqcurrentdiskname:PWideChar;
     tydqcurrentpath:PWideChar;
@@ -159,6 +164,94 @@ begin
    Wstrset(totalpath,path);
   end;
  tydq_combine_path_and_filename:=totalpath;
+end;
+function tydq_time_to_string(orgtime:tydqfs_time):PWideChar;[public,alias:'TYDQ_TIME_TO_STRING'];
+var res,partstr,partstr2:PWideChar;
+begin
+ Wstrinit(res,256);
+ partstr:=UintToPWChar(orgtime.year);
+ Wstrset(res,partstr);
+ Wstrcat(res,'/');
+ Wstrfree(partstr);
+ partstr:=UintToPWchar(orgtime.month);
+ if(Wstrlen(partstr)=1) then Wstrcat(res,'0');
+ Wstrcat(res,partstr);
+ Wstrcat(res,'/');
+ Wstrfree(partstr);
+ partstr:=UintToPWChar(orgtime.day);
+ if(Wstrlen(partstr)=1) then Wstrcat(res,'0');
+ Wstrcat(res,partstr);
+ Wstrfree(partstr);
+ Wstrcat(res,' ');
+ partstr:=UintToPWChar(orgtime.hour);
+ if(Wstrlen(partstr)=1) then Wstrcat(res,'0');
+ Wstrcat(res,partstr);
+ Wstrfree(partstr);
+ Wstrcat(res,':');
+ partstr:=UintToPWChar(orgtime.minute);
+ if(Wstrlen(partstr)=1) then Wstrcat(res,'0');
+ Wstrcat(res,partstr);
+ Wstrfree(partstr);
+ Wstrcat(res,':');
+ partstr:=UintToPWChar(orgtime.second);
+ if(Wstrlen(partstr)=1) then Wstrcat(res,'0');
+ Wstrcat(res,partstr);
+ Wstrfree(partstr);
+ tydq_time_to_string:=res;
+end;
+procedure tydq_diskname_and_path_initialize;[public,alias:'TYDQ_DISKNAME_AND_PATH_INITIALIZE'];
+begin
+ Wstrinit(tydqcurrentdiskname,256);
+ Wstrinit(tydqcurrentpath,16384);
+end;
+function tydq_fs_locate_diskindex(edl:efi_disk_list;path:PWideChar):natuint;[public,alias:'TYDQ_FS_LOCATE_DISKINDEX'];
+var pos,res:natuint;
+    partstr:PWideChar;
+begin
+ if(path<>nil) then
+  begin
+   pos:=Wstrpos(path,'/',1);
+   partstr:=Wstrcutout(path,1,pos-1);
+   res:=tydq_fs_disk_index(edl,partstr);
+  end
+ else res:=0;
+ if(res=0) then tydq_fs_locate_diskindex:=tydq_fs_disk_index(edl,tydqcurrentdiskname) else tydq_fs_locate_diskindex:=res;
+end;
+function tydq_fs_locate_fullpath(edl:efi_disk_list;path:PWideChar):PWideChar;[public,alias:'TYDQ_FS_LOCATE_FULLPATH'];
+var pos,procnum:natuint;
+    res,partstr,partstr2:PWideChar;
+begin
+ if(path<>nil) then
+  begin
+   pos:=Wstrpos(path,'/',1); 
+   partstr2:=Wstrcutout(path,1,pos-1);
+   procnum:=tydq_fs_disk_index(edl,partstr2);
+   Wstrfree(partstr2);
+  end
+ else pos:=0;
+ if(pos=1) then res:=Wstrcutout(path,pos,Wstrlen(path)) 
+ else if(pos>0) then
+  begin
+   if(procnum=0) then
+    begin
+     Wstrinit(partstr,16384);
+     Wstrset(partstr,tydqcurrentpath);
+     Wstrcat(partstr,'/');
+     Wstrcat(partstr,path);
+    end
+   else if(procnum>0) then
+    begin
+     partstr:=Wstrcutout(path,pos,Wstrlen(path));
+    end;
+   res:=partstr;
+  end
+ else if(pos=0) then
+  begin
+   Wstrinit(partstr,16384);
+   Wstrset(partstr,tydqcurrentpath);
+   res:=partstr;
+  end;
+ tydq_fs_locate_fullpath:=res;
 end;
 function tydq_fs_byte_to_attribute_bool(attr:byte):tydqfs_attribute_bool;[public,alias:'TYDQ_FS_BYTE_TO_ATTRIBUTE_BOOL'];
 var mybool:tydqfs_attribute_bool;
@@ -222,6 +315,7 @@ var tydqdp:Pefi_disk_io_protocol;
     tydqbp:Pefi_block_io_protocol;
     res:tydqfs_header;
 begin
+ if(diskindex=0) then exit;
  tydqdp:=(edl.disk_content+diskindex-1)^;
  tydqbp:=(edl.disk_block_content+diskindex-1)^;
  tydqdp^.ReadDisk(tydqdp,tydqbp^.Media^.MediaId,0,sizeof(tydqfs_header),res);
@@ -275,10 +369,12 @@ function tydq_fs_disk_exists(edl:efi_disk_list;diskname:PWideChar):boolean;[publ
 var i:natuint;
     fsh:tydqfs_header;
 begin
- for i:=1 to edl.disk_count do
+ i:=1;
+ while(i<=edl.disk_count) do
   begin
    fsh:=tydq_fs_read_header(edl,i);
-   if(WstrCmp(diskname,@fsh.RootName)=0) then break;
+   if(WstrCmp(diskname,@fsh.RootName)=0) and (Wstrlen(diskname)=Wstrlen(@fsh.RootName)) then break;
+   inc(i);
   end;
  if(i>edl.disk_count) then tydq_fs_disk_exists:=false else tydq_fs_disk_exists:=true;
 end;
@@ -286,12 +382,23 @@ function tydq_fs_disk_index(edl:efi_disk_list;diskname:PWideChar):natuint;[publi
 var i:natuint;
     fsh:tydqfs_header;
 begin
- for i:=1 to edl.disk_count do
+ i:=1;
+ while(i<=edl.disk_count) do
   begin
    fsh:=tydq_fs_read_header(edl,i);
-   if(WstrCmp(diskname,@fsh.RootName)=0) then break;
+   if(WstrCmp(diskname,@fsh.RootName)=0) and (Wstrlen(diskname)=Wstrlen(@fsh.RootName)) then break;
+   inc(i);
   end;
  if(i>edl.disk_count) then tydq_fs_disk_index:=0 else tydq_fs_disk_index:=i+1;
+end;
+function tydq_fs_disk_name(edl:efi_disk_list;index:natuint):PWideChar;[public,alias:'TYDQ_FS_DISK_NAME'];
+var fsh:tydqfs_header;
+    res:PWideChar;
+begin
+ Wstrinit(res,256);
+ fsh:=tydq_fs_read_header(edl,index);
+ Wstrset(res,@fsh.RootName);
+ tydq_fs_disk_name:=res;
 end;
 function tydq_fs_file_exists(edl:efi_disk_list;diskindex:natuint;filename:PWideChar):boolean;[public,alias:'TYDQ_FS_FILE_EXISTS'];
 var dp:Pefi_disk_io_protocol;
@@ -432,7 +539,7 @@ var dp:Pefi_disk_io_protocol;
     fsh:tydqfs_header;
     fsf,rfsf,pfsf:tydqfs_file;
     partstr,partstr2:PWideChar;
-    i,j,pos1,pos2,mpos,cpos,rpos,ppos:natuint;
+    i,j,pos1,pos2,mpos,cpos,rpos,ppos,procnum:natuint;
     gtime:efi_time;
     ctime:efi_time_capabilities;
     bool:boolean;
@@ -442,6 +549,7 @@ begin
  if(fsh.usedsize+sizeof(natuint)+sizeof(tydqfs_file)>fsh.maxsize) then exit;
  if(tydq_fs_byte_to_attribute_bool(attr)[6]=true) and (userlevel<>userlevel_system) then exit;
  if(tydq_fs_byte_to_attribute_bool(attr)[6]=true) and (tydq_fs_byte_to_attribute_bool(attr)[7]=true) then exit;
+ if(tydq_fs_byte_to_attribute_bool(attr)[6]=false) and (tydq_fs_byte_to_attribute_bool(attr)[7]=false) then exit;
  if(tydq_fs_file_exists(edl,diskindex,filename)=false) then
   begin
    pos1:=1; pos2:=2; mpos:=0; 
@@ -455,7 +563,8 @@ begin
        Wstrfree(partstr2);
        partstr:=Wstrcutout(filename,pos1+1,pos2-1);
        systemtable^.RuntimeServices^.GetTime(gtime,ctime);
-       fsf:=tydq_file_initialize(tydqfs_folder,mpos,gtime,partstr,belonguserindex);
+       if(userlevel=userlevel_system) then fsf:=tydq_file_initialize(tydqfs_folder or tydqfs_system_file,mpos,gtime,partstr,belonguserindex)
+       else fsf:=tydq_file_initialize(tydqfs_folder or tydqfs_normal_file,mpos,gtime,partstr,belonguserindex);
        if(bool=false) then
         begin
          cpos:=fsh.usedsize+sizeof(natuint);
@@ -470,16 +579,16 @@ begin
           end;
          while(i<fsh.usedsize) do
           begin
-           dp^.ReadDisk(dp,bp^.Media^.MediaId,i,sizeof(tydqfs_header),rfsf);
+           dp^.ReadDisk(dp,bp^.Media^.MediaId,i,sizeof(tydqfs_file),rfsf);
            if(mpos=0) then
             begin
-             if(rfsf.fparentpos>sizeof(tydqfs_header)+fsh.RootCount) then rfsf.fparentpos:=rfsf.fparentpos+sizeof(natuint);
+             if(rfsf.fparentpos>=sizeof(tydqfs_header)+fsh.RootCount) then rfsf.fparentpos:=rfsf.fparentpos+sizeof(natuint);
             end
            else if(mpos>0) then
             begin
-             if(rfsf.fparentpos>mpos+sizeof(tydqfs_file)+pfsf.fContentCount) then rfsf.fparentpos:=rfsf.fparentpos+sizeof(natuint);
+             if(rfsf.fparentpos>=mpos+sizeof(tydqfs_file)+pfsf.fContentCount) then rfsf.fparentpos:=rfsf.fparentpos+sizeof(natuint);
             end;
-           if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[8]=true) and (rfsf.fContentCount>0) then
+           if(tydq_fs_byte_to_attribute_bool(rfsf.fattribute)[8]=true) and (rfsf.fContentCount>0) then
             begin
              for j:=1 to rfsf.fcontentCount div sizeof(natuint) do
               begin
@@ -495,16 +604,32 @@ begin
           begin
            tydq_fs_disk_move_right(edl,diskindex,sizeof(tydqfs_header)+fsh.RootCount,fsh.usedsize-1,sizeof(natuint));
            dp^.WriteDisk(dp,bp^.Media^.MediaId,sizeof(tydqfs_header)+fsh.RootCount,sizeof(natuint),@cpos);
+           for j:=1 to fsh.RootCount div sizeof(natuint) do
+            begin
+             dp^.ReadDisk(dp,bp^.Media^.MediaId,sizeof(tydqfs_header)+(j-1)*sizeof(natuint),sizeof(natuint),procnum);
+             procnum:=procnum+sizeof(natuint);
+             dp^.WriteDisk(dp,bp^.Media^.MediaId,sizeof(tydqfs_header)+(j-1)*sizeof(natuint),sizeof(natuint),@procnum);
+            end;
            dp^.WriteDisk(dp,bp^.Media^.MediaId,cpos,sizeof(tydqfs_file),@fsf);
           end
          else if(mpos>0) then
           begin
-           tydq_fs_disk_move_right(edl,diskindex,mpos+sizeof(tydqfs_file)+fsf.fContentCount,fsh.usedsize-1,sizeof(natuint));
-           dp^.WriteDisk(dp,bp^.Media^.MediaId,mpos+sizeof(tydqfs_file)+fsf.fContentCount,sizeof(natuint),@cpos);
+           tydq_fs_disk_move_right(edl,diskindex,mpos+sizeof(tydqfs_file)+pfsf.fContentCount,fsh.usedsize-1,sizeof(natuint));
+           dp^.WriteDisk(dp,bp^.Media^.MediaId,mpos+sizeof(tydqfs_file)+pfsf.fContentCount,sizeof(natuint),@cpos);
+           for j:=1 to pfsf.fContentCount div sizeof(natuint) do
+            begin
+             dp^.ReadDisk(dp,bp^.Media^.MediaId,mpos+sizeof(tydqfs_file)+(j-1)*sizeof(natuint),sizeof(natuint),procnum);
+             procnum:=procnum+sizeof(natuint);
+             dp^.WriteDisk(dp,bp^.Media^.MediaId,mpos+sizeof(tydqfs_file)+(j-1)*sizeof(natuint),sizeof(natuint),@procnum);
+            end;
            dp^.WriteDisk(dp,bp^.Media^.MediaId,cpos,sizeof(tydqfs_file),@fsf);
           end;
          fsh.usedsize:=fsh.usedsize+sizeof(natuint)+sizeof(tydqfs_file);
-         if(pos1=1) then fsh.RootCount:=fsh.RootCount+sizeof(natuint) else
+         if(pos1=1) then 
+          begin
+           fsh.RootCount:=fsh.RootCount+sizeof(natuint);
+          end
+         else
           begin 
            pfsf.fContentCount:=pfsf.fcontentCount+sizeof(natuint);
            dp^.WriteDisk(dp,bp^.Media^.MediaId,mpos,sizeof(tydqfs_file),@pfsf);
@@ -517,7 +642,7 @@ begin
          ppos:=tydq_fs_file_position(edl,diskindex,partstr2);
          Wstrfree(partstr2);
          dp^.ReadDisk(dp,bp^.Media^.MediaId,ppos,sizeof(tydqfs_file),fsf);
-         if(fsf.fbelonguserindex<>belonguserindex) and (fsf.fbelonguserindex>=2) then
+         if(fsf.fbelonguserindex<>belonguserindex) and (belonguserindex>=2) then
           begin
            Wstrfree(partstr); exit;
           end;
@@ -533,7 +658,7 @@ begin
          else if(mpos>0) then
           begin
            dp^.ReadDisk(dp,bp^.Media^.MediaId,mpos,sizeof(tydqfs_file),rfsf);
-           for i:=1 to fsh.RootCount div sizeof(natuint) do
+           for i:=1 to rfsf.fContentCount div sizeof(natuint) do
             begin
              dp^.ReadDisk(dp,bp^.Media^.MediaId,mpos+sizeof(tydqfs_file)+(i-1)*sizeof(natuint),sizeof(natuint),cpos);
              dp^.ReadDisk(dp,bp^.Media^.MediaId,cpos,sizeof(natuint),fsf);
@@ -559,26 +684,30 @@ begin
         end
        else if(mpos>0) then
         begin
-         tydq_fs_disk_move_right(edl,diskindex,mpos+sizeof(tydqfs_file)+fsf.fContentCount,fsh.usedsize-1,sizeof(natuint));
-         dp^.WriteDisk(dp,bp^.Media^.MediaId,mpos+sizeof(tydqfs_file)+fsf.fContentCount,sizeof(natuint),@cpos);
+         dp^.ReadDisk(dp,bp^.Media^.MediaId,mpos,sizeof(tydqfs_file),rfsf);
+         tydq_fs_disk_move_right(edl,diskindex,mpos+sizeof(tydqfs_file)+rfsf.fContentCount,fsh.usedsize-1,sizeof(natuint));
+         dp^.WriteDisk(dp,bp^.Media^.MediaId,mpos+sizeof(tydqfs_file)+rfsf.fContentCount,sizeof(natuint),@cpos);
          dp^.WriteDisk(dp,bp^.Media^.MediaId,cpos,sizeof(tydqfs_file),@fsf);
         end;
        fsh.usedsize:=fsh.usedsize+sizeof(natuint)+sizeof(tydqfs_file);
-       if(pos1=1) then fsh.RootCount:=fsh.RootCount+sizeof(natuint)
+       if(pos1=1) then 
+        begin
+         fsh.RootCount:=fsh.RootCount+sizeof(natuint);
+        end
        else
         begin
-         dp^.ReadDisk(dp,bp^.Media^.MediaId,mpos,sizeof(tydqfs_file),rfsf);
          rfsf.fContentCount:=rfsf.fContentCount+sizeof(natuint);
          dp^.WriteDisk(dp,bp^.Media^.MediaId,mpos,sizeof(tydqfs_file),@rfsf);
         end;
        mpos:=cpos;
        Wstrfree(partstr);
+       break;
       end;
     end;
    tydq_fs_write_header(edl,diskindex,fsh);
   end;
 end;
-function tydq_fs_list_file(edl:efi_disk_list;diskindex:natuint;path:PWideChar;detecthidden:boolean;belonguserindex:qword):tydqfs_file_list;[public,alias:'TYDQ_FS_LIST_FILE'];
+function tydq_fs_list_file(edl:efi_disk_list;diskindex:natuint;path:PWideChar;expanded:boolean;detecthidden:boolean;belonguserindex:qword):tydqfs_file_list;[public,alias:'TYDQ_FS_LIST_FILE'];
 var dp:Pefi_disk_io_protocol;
     bp:Pefi_block_io_protocol;
     fsh:tydqfs_header;
@@ -656,7 +785,7 @@ begin
        Wstrset((res.files_content+res.files_count-1)^,@fsf.fname);
        if(detecthidden=true) and ((fsf.fbelonguserindex=belonguserindex) or (fsf.fbelonguserindex=0)) then canaddtolist:=true 
        else if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[5]=true) or 
-       ((fsf.fbelonguserindex<>belonguserindex) and (fsf.fbelonguserindex<>0)) then canaddtolist:=false
+       ((fsf.fbelonguserindex<>belonguserindex) and (fsf.fbelonguserindex>=2)) then canaddtolist:=false
        else canaddtolist:=true;
        if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[8]=true) and (canaddtolist=true) and (fsf.fContentCount>0) then
         begin
@@ -670,7 +799,7 @@ begin
            Wstrinit(partstr,Wstrlen((res.files_basepath+res.files_count-1)^)+Wstrlen((res.files_content+res.files_count-1)^)+1);
            Wstrset(partstr,path); WstrCat(partstr,'/'); WstrCat(partstr,@fsf.fname);
           end;
-         res:=tydq_fs_filelist_combine(res,tydq_fs_list_file(edl,diskindex,partstr,detecthidden,belonguserindex));
+         if(expanded) then res:=tydq_fs_filelist_combine(res,tydq_fs_list_file(edl,diskindex,partstr,expanded,detecthidden,belonguserindex));
          Wstrfree(partstr);
         end;
       end;
@@ -680,7 +809,7 @@ begin
      dp^.ReadDisk(dp,bp^.Media^.MediaId,mpos,sizeof(tydqfs_file),rfsf);
      if(detecthidden=true) and ((rfsf.fbelonguserindex=belonguserindex) or (rfsf.fbelonguserindex=0)) then canaddtolist:=true
      else if(tydq_fs_byte_to_attribute_bool(rfsf.fattribute)[5]=true) or 
-     ((rfsf.fbelonguserindex<>belonguserindex) and (rfsf.fbelonguserindex<>0)) then canaddtolist:=false
+     ((rfsf.fbelonguserindex<>belonguserindex) and (rfsf.fbelonguserindex>=2)) then canaddtolist:=false
      else canaddtolist:=true;
      if(tydq_fs_byte_to_attribute_bool(rfsf.fattribute)[8]=true) and (canaddtolist=true) then
       begin
@@ -720,7 +849,7 @@ begin
             Wstrinit(partstr,Wstrlen((res.files_basepath+res.files_count-1)^)+Wstrlen((res.files_content+res.files_count-1)^)+1);
             Wstrset(partstr,path); WstrCat(partstr,'/'); WstrCat(partstr,@fsf.fname);
            end;
-          res:=tydq_fs_filelist_combine(res,tydq_fs_list_file(edl,diskindex,partstr,detecthidden,belonguserindex));
+          if(expanded) then res:=tydq_fs_filelist_combine(res,tydq_fs_list_file(edl,diskindex,partstr,expanded,detecthidden,belonguserindex));
           Wstrfree(partstr);
          end;
         end;
@@ -751,7 +880,7 @@ begin
  dp:=(edl.disk_content+diskindex-1)^; bp:=(edl.disk_block_content+diskindex-1)^; fsh:=tydq_fs_read_header(edl,diskindex); zero:=0;
  if(Wstrcmp(filename,'/')=0) and (Wstrlen(filename)=1) then exit(1);
  if(tydq_fs_file_exists(edl,diskindex,filename)=false) then exit(2);
- fsl:=tydq_fs_list_file(edl,diskindex,filename,true,belonguserindex);
+ fsl:=tydq_fs_list_file(edl,diskindex,filename,true,true,belonguserindex);
  fstl.files_fullpath:=allocmem(sizeof(PWideChar)*fsl.files_count);
  fstl.files_position:=allocmem(sizeof(natuint)*fsl.files_count);
  fstl.files_count:=fsl.files_count;
@@ -790,6 +919,7 @@ begin
   begin 
    if((fstl.files_position+i-1)^=0) then continue;
    dp^.ReadDisk(dp,bp^.Media^.MediaId,(fstl.files_position+i-1)^,sizeof(tydqfs_file),fsf);
+   if(Wstrcmp('SystemInfo.dqi',@fsf.fName)=0) and (Wstrlen(@fsf.fName)=Wstrlen('SystemInfo.dqi')) and (fsf.fparentpos=0) then continue;
    if(fsf.fparentpos=0) then j:=sizeof(tydqfs_header)+fsh.RootCount
    else if(fsf.fparentpos>0) then j:=(fstl.files_position+i-1)^+sizeof(tydqfs_file)+fsf.fContentCount;
    while(j<fsh.usedsize) do
@@ -823,6 +953,15 @@ begin
      tydq_fs_disk_move_left(edl,diskindex,(fstl.files_position+i-1)^+sizeof(tydqfs_file)+fsf.fContentCount,fsh.usedsize-1,sizeof(natuint)+sizeof(tydqfs_file)
      +fsf.fContentCount);
      if(fsh.RootCount>=sizeof(natuint)) then fsh.RootCount:=fsh.RootCount-sizeof(natuint);
+     if(fsh.RootCount>0) then
+      begin
+       for j:=1 to fsh.RootCount div sizeof(natuint) do
+        begin
+         dp^.ReadDisk(dp,bp^.Media^.MediaId,sizeof(tydqfs_header)+(i-1)*sizeof(natuint),sizeof(natuint),procnum);
+         procnum:=procnum-sizeof(natuint);
+         dp^.WriteDisk(dp,bp^.Media^.MediaId,sizeof(tydqfs_header)+(i-1)*sizeof(natuint),sizeof(natuint),@procnum);
+        end;
+      end;
     end
    else if(fsf.fparentpos>0) then
     begin
@@ -831,6 +970,15 @@ begin
      tydq_fs_disk_move_left(edl,diskindex,(fstl.files_position+i-1)^+sizeof(tydqfs_file)+fsf.fContentCount,fsh.usedsize-1,sizeof(natuint)+sizeof(tydqfs_file)
      +fsf.fContentCount);
      if(rfsf.fContentCount>=sizeof(natuint)) then rfsf.fContentCount:=rfsf.fContentCount-sizeof(natuint);
+     if(tydq_fs_byte_to_attribute_bool(rfsf.fattribute)[8]=true) and (rfsf.fContentCount>0) then
+      begin
+       for j:=1 to rfsf.fContentCount div sizeof(natuint) do
+        begin
+         dp^.ReadDisk(dp,bp^.Media^.MediaId,fsf.fparentpos+sizeof(tydqfs_file)+(i-1)*sizeof(natuint),sizeof(natuint),procnum);
+         procnum:=procnum-sizeof(natuint);
+         dp^.WriteDisk(dp,bp^.Media^.MediaId,fsf.fparentpos+sizeof(tydqfs_file)+(i-1)*sizeof(natuint),sizeof(natuint),@procnum);
+        end;
+      end;
      dp^.WriteDisk(dp,bp^.Media^.MediaId,fsf.fparentpos,sizeof(tydqfs_file),@rfsf);
     end;
    fsh.usedsize:=fsh.usedsize-sizeof(natuint)-sizeof(tydqfs_file)-fsf.fContentCount;
@@ -854,10 +1002,10 @@ begin
  fpos:=tydq_fs_file_position(edl,diskindex,filename);
  dp^.ReadDisk(dp,bp^.Media^.MediaId,fpos,sizeof(tydqfs_file),fsf);
  if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[8]=true) then exit(fsd);
- if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[6]=true) and (userlevel<>userlevel_system) then exit(fsd);
+ if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[6]=true) and (userlevel<>userlevel_system) and (fsf.fbelonguserindex>0) then exit(fsd);
  if(position-1>fsf.fContentCount) then exit(fsd);
- if(fsf.fbelonguserindex<>belonguserindex) and (fsf.fbelonguserindex>=2) then exit(fsd);
- fsd.fsdata:=allocmem(1);
+ if(fsf.fbelonguserindex<>belonguserindex) and (belonguserindex>=2) then exit(fsd);
+ fsd.fsdata:=nil;
  for i:=1 to readlength do
   begin
    inc(fsd.fssize);
@@ -877,9 +1025,12 @@ begin
  fpos:=tydq_fs_file_position(edl,diskindex,filename);
  fsf.fparentpos:=0; fsf.fattribute:=0; fsf.fName[1]:=#0; fsf.fcontentCount:=0;
  if(fpos=0) then exit(fsf);
- if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[6]=true) and (userlevel<>userlevel_system) then exit(fsf);
  dp^.ReadDisk(dp,bp^.Media^.MediaId,fpos,sizeof(tydqfs_file),fsf);
- if(fsf.fbelonguserindex<>belonguserindex) and (fsf.fbelonguserindex>=2) then 
+ if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[6]=true) and (userlevel<>userlevel_system) and (fsf.fbelonguserindex>=2) then 
+  begin
+   fsf.fparentpos:=0; fsf.fattribute:=0; fsf.fName[1]:=#0; fsf.fcontentCount:=0; exit(fsf);
+  end;
+ if(fsf.fbelonguserindex<>belonguserindex) and (belonguserindex>=2) then 
   begin
    fsf.fparentpos:=0; fsf.fattribute:=0; fsf.fName[1]:=#0; fsf.fcontentCount:=0; exit(fsf);
   end;
@@ -898,11 +1049,11 @@ begin
  dp:=(edl.disk_content+diskindex-1)^; bp:=(edl.disk_block_content+diskindex-1)^; fsh:=tydq_fs_read_header(edl,diskindex);
  fpos:=tydq_fs_file_position(edl,diskindex,filename);
  if(fpos=0) then exit;
- if(fpos+sizeof(fsf)+offset+writesize>=fsh.maxsize) then exit;
+ if(fpos+sizeof(tydqfs_file)+offset+writesize>=fsh.maxsize) then exit;
  dp^.ReadDisk(dp,bp^.Media^.MediaId,fpos,sizeof(tydqfs_file),fsf);
  if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[8]=true) then exit;
- if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[6]=true) and (userlevel<>userlevel_system) then exit;
- if(fsf.fbelonguserindex<>belonguserindex) and (fsf.fbelonguserindex>=2) then exit;
+ if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[6]=true) and (userlevel<>userlevel_system) and (fsf.fbelonguserindex>0) then exit;
+ if(fsf.fbelonguserindex<>belonguserindex) and (belonguserindex>=2) then exit;
  if(offset+writesize>fsf.fContentCount) then status:=true else status:=false;
  if(status) then
   begin
@@ -980,8 +1131,8 @@ begin
  dp^.ReadDisk(dp,bp^.Media^.MediaId,fpos,sizeof(tydqfs_file),fsf);
  toffset:=fsf.fContentCount-writesize;
  if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[8]=true) then exit;
- if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[6]=true) and (userlevel<>userlevel_system) then exit;
- if(fsf.fbelonguserindex<>belonguserindex) and (fsf.fbelonguserindex>=2) then exit;
+ if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[6]=true) and (userlevel<>userlevel_system) and (fsf.fbelonguserindex>0) then exit;
+ if(fsf.fbelonguserindex<>belonguserindex) and (belonguserindex>=2) then exit;
  if(fsf.fparentpos=0) then
   begin
    for i:=1 to fsh.RootCount div sizeof(natuint) do
@@ -1061,14 +1212,14 @@ var total_info_str:PChar;
 begin
  if(tydq_fs_disk_is_formatted(edl,diskindex)=false) then exit;
  if(diskindex>edl.disk_count) then exit;
- strinit(total_info_str,1024*1024*64);
+ strinit(total_info_str,1024*1024);
  strset(total_info_str,'[SystemInfo]'#10);
  strCat(total_info_str,'Graphics=False'#10);
  strCat(total_info_str,'EnableNetwork=False'#10);
  strCat(total_info_str,'Language=English'#10);
  strCat(total_info_str,'UserCount=0');
  encrypted_info_str:=PChar_encrypt_to_passwd(total_info_str);
- tydq_fs_create_file(systemtable,edl,diskindex,'/SystemInfo.dqi',tydqfs_system_file or tydqfs_hidden_file,userlevel_system,1);
+ tydq_fs_create_file(systemtable,edl,diskindex,'/SystemInfo.dqi',tydqfs_system_file or tydqfs_hidden_file or tydqfs_binary_file,userlevel_system,1);
  tydq_fs_file_rewrite(systemtable,edl,diskindex,'/SystemInfo.dqi',encrypted_info_str,sizeof(Char)*(strlen(encrypted_info_str)+1),userlevel_system,1);
  strfree(encrypted_info_str);
  strfree(total_info_str);
@@ -1088,7 +1239,7 @@ begin
  while(index<=edl.disk_count) do
   begin
    fsf:=tydq_fs_file_info(edl,index,'/SystemInfo.dqi',userlevel_system,1);
-   if(tydq_fs_file_exists(edl,index,'/SystemInfo.dqi')) and (fsf.fattribute=tydqfs_system_file or tydqfs_hidden_file) then break;
+   if(tydq_fs_file_exists(edl,index,'/SystemInfo.dqi')) and (fsf.fattribute=tydqfs_system_file or tydqfs_hidden_file or tydqfs_binary_file) then break;
    inc(index);
   end;
  if(index>edl.disk_count) then exit(tydq_fs_systeminfo_init(0));
@@ -1101,7 +1252,7 @@ begin
  while(i<=len) do
   begin
    inc(optionnum);
-   if(optionnum>=6) and (usercount<(optionnum-5) div 2) then
+   if(optionnum>=6) and (usercount<(optionnum-5) div 3) then
     begin
      freemem(res.userinfolist); break;
     end
@@ -1155,31 +1306,42 @@ begin
      usercount:=PCharToUint(valuestr);
      res.header.tydqusercount:=usercount;
     end;
-   if(optionnum>=6) and ((optionnum-5) mod 2=1) and (strcmp(optionstr,'UserName')<>0) then
+   if(optionnum>=6) and ((optionnum-5) mod 3=1) and (strcmp(optionstr,'UserName')<>0) then
     begin
      res:=tydq_fs_systeminfo_init(0); break;
     end
-   else if(optionnum>=6) and ((optionnum-5) mod 2=1) then
+   else if(optionnum>=6) and ((optionnum-5) mod 3=1) then
     begin
       partstr2:=PCharToPWChar(valuestr);
       mysize:=getmemsize(partstr2);
-      Wstrinit((res.userinfolist+(optionnum-5) div 2)^.username,strlen(valuestr));
-      Wstrset((res.userinfolist+(optionnum-5) div 2)^.username,partstr2);
+      Wstrinit((res.userinfolist+(optionnum-5) div 3)^.username,strlen(valuestr));
+      Wstrset((res.userinfolist+(optionnum-5) div 3)^.username,partstr2);
       freemem(partstr2);
-      (res.userinfolist+(optionnum-5) div 2)^.username:=PWideChar(Pointer((res.userinfolist+(optionnum-5) div 2)^.username)-mysize);
+      (res.userinfolist+(optionnum-5) div 3)^.username:=PWideChar(Pointer((res.userinfolist+(optionnum-5) div 3)^.username)-mysize);
     end;
-   if(optionnum>=6) and ((optionnum-5) mod 2=0) and (strcmp(optionstr,'UserPasswd')<>0) then
+   if(optionnum>=6) and ((optionnum-5) mod 3=2) and (strcmp(optionstr,'UserPasswd')<>0) then
     begin
      res:=tydq_fs_systeminfo_init(0); break;
     end
-   else if(optionnum>=6) and ((optionnum-5) mod 2=0) then
+   else if(optionnum>=6) and ((optionnum-5) mod 3=2) then
     begin
       partstr2:=PCharToPWChar(valuestr);
       mysize:=getmemsize(partstr2);
-      Wstrinit((res.userinfolist+(optionnum-5) div 2-1)^.userpasswd,strlen(valuestr));
-      Wstrset((res.userinfolist+(optionnum-5) div 2-1)^.userpasswd,partstr2);
+      Wstrinit((res.userinfolist+(optionnum-5) div 3)^.userpasswd,strlen(valuestr));
+      Wstrset((res.userinfolist+(optionnum-5) div 3)^.userpasswd,partstr2);
       freemem(partstr2);
-      (res.userinfolist+(optionnum-5) div 2-1)^.userpasswd:=PWideChar(Pointer((res.userinfolist+(optionnum-5) div 2-1)^.userpasswd)-mysize);
+      (res.userinfolist+(optionnum-5) div 3)^.userpasswd:=PWideChar(Pointer((res.userinfolist+(optionnum-5) div 3)^.userpasswd)-mysize);
+    end;
+   if(optionnum>=6) and ((optionnum-5) mod 3=0) and (strcmp(optionstr,'UserManager')<>0) then
+    begin 
+     res:=tydq_fs_systeminfo_init(0); break;
+    end
+   else if(optionnum>=6) and ((optionnum-5) mod 3=0) then
+    begin
+     if(strcmp(valuestr,'True')=0) then 
+     (res.userinfolist+(optionnum-5) div 3-1)^.usermanager:=true
+     else
+     (res.userinfolist+(optionnum-5) div 3-1)^.usermanager:=false;
     end;
    if(optionnum>1) then
     begin
@@ -1187,15 +1349,15 @@ begin
      strfree(valuestr); strfree(optionstr);
     end;
    strfree(partstr);
-   if(optionnum>=6) and ((optionnum-5) mod 2=1) then
+   if(optionnum>=6) and ((optionnum-5) mod 3=1) then
     begin
-     (res.userinfolist+(optionnum-5) div 2)^.username:=
-     PWideChar(Pointer((res.userinfolist+(optionnum-5) div 2)^.username)-mysize);
+     (res.userinfolist+(optionnum-5) div 3)^.username:=
+     PWideChar(Pointer((res.userinfolist+(optionnum-5) div 3)^.username)-mysize);
     end
-   else if(optionnum>=6) and ((optionnum-5) mod 2=0) then
+   else if(optionnum>=6) and ((optionnum-5) mod 3=2) then
     begin
-     (res.userinfolist+(optionnum-5) div 2-1)^.userpasswd:=
-     PWideChar(Pointer((res.userinfolist+(optionnum-5) div 2-1)^.userpasswd)-mysize);
+     (res.userinfolist+(optionnum-5) div 3)^.userpasswd:=
+     PWideChar(Pointer((res.userinfolist+(optionnum-5) div 3)^.userpasswd)-mysize);
     end;
    if(j>0) then i:=j+1 else break; 
   end;
@@ -1221,11 +1383,11 @@ begin
   while(index<=edl.disk_count) do
    begin
     fsf:=tydq_fs_file_info(edl,index,'/SystemInfo.dqi',userlevel_system,1);
-    if(tydq_fs_file_exists(edl,index,'/SystemInfo.dqi')) and (fsf.fattribute=tydqfs_system_file or tydqfs_hidden_file) then break;
+    if(tydq_fs_file_exists(edl,index,'/SystemInfo.dqi')) and (fsf.fattribute=tydqfs_system_file or tydqfs_hidden_file or tydqfs_binary_file) then break;
     inc(index);
    end;
   if(index>edl.disk_count) then exit;
-  Strinit(orgstr,1024*1024*64);
+  Strinit(orgstr,1024*1024);
   Strset(orgstr,'[SystemInfo]'#10);
   if(writeinfo.header.tydqgraphics=true) then
    begin
@@ -1267,6 +1429,8 @@ begin
      partstr:=PWCharToPChar((writeinfo.userinfolist+i-1)^.userpasswd);
      strcat(orgstr,partstr);
      strfree(partstr);
+     strcat(orgstr,#10);
+     if((writeinfo.userinfolist+i-1)^.usermanager) then strcat(orgstr,'UserManager=True') else strcat(orgstr,'UserManager=False');
      if(i<writeinfo.header.tydqusercount) then strcat(orgstr,#10);
    end;
   passwdstr:=PChar_encrypt_to_passwd(orgstr);
@@ -1282,12 +1446,12 @@ begin
  while(index<=edl.disk_count) do
   begin
    fsf:=tydq_fs_file_info(edl,index,'/SystemInfo.dqi',userlevel_system,1);
-   if(tydq_fs_file_exists(edl,index,'/SystemInfo.dqi')) and (fsf.fattribute=tydqfs_system_file or tydqfs_hidden_file) then break;
+   if(tydq_fs_file_exists(edl,index,'/SystemInfo.dqi')) and (fsf.fattribute=tydqfs_system_file or tydqfs_hidden_file or tydqfs_binary_file) then break;
    inc(index);
   end;
  if(index>edl.disk_count) then exit(0) else exit(index);
 end;
-procedure tydq_fs_systeminfo_add_user(var sysinfo:tydqfs_system_info;newusername,newuserpasswd:PWideChar);[public,alias:'TYDQ_FS_SYSTEMINFO_ADD_USER'];
+procedure tydq_fs_systeminfo_add_user(var sysinfo:tydqfs_system_info;newusername,newuserpasswd:PWideChar;Manager:boolean);[public,alias:'TYDQ_FS_SYSTEMINFO_ADD_USER'];
 var i,size:natuint;
 begin
  for i:=1 to sysinfo.header.tydqusercount do
@@ -1295,17 +1459,18 @@ begin
    if(Wstrcmp((sysinfo.userinfolist+i-1)^.username,newusername)=0) and (Wstrlen((sysinfo.userinfolist+i-1)^.username)=Wstrlen(newusername)) then exit;
   end;
  inc(sysinfo.header.tydqusercount);
- size:=sizeof(tydqfs_user_info)*(sysinfo.header.tydqusercount-1);
+ size:=getmemsize(sysinfo.userinfolist);
  ReallocMem(sysinfo.userinfolist,sizeof(tydqfs_user_info)*sysinfo.header.tydqusercount);
  for i:=1 to sysinfo.header.tydqusercount-1 do
   begin
-   (sysinfo.userinfolist+i-1)^.username:=sysinfo.userinfolist^.username-size div sizeof(WideChar);
-   (sysinfo.userinfolist+i-1)^.userpasswd:=sysinfo.userinfolist^.userpasswd-size div sizeof(WideChar);
+   (sysinfo.userinfolist+i-1)^.username:=PWideChar(Pointer(sysinfo.userinfolist^.username)-size);
+   (sysinfo.userinfolist+i-1)^.userpasswd:=PWideChar(Pointer(sysinfo.userinfolist^.userpasswd)-size);
   end;
  Wstrinit((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.username,Wstrlen(newusername));
  Wstrset((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.username,newusername);
  Wstrinit((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.userpasswd,Wstrlen(newuserpasswd));
  Wstrset((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.userpasswd,newuserpasswd);
+ (sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.usermanager:=Manager;
 end;
 procedure tydq_fs_systeminfo_delete_user(var sysinfo:tydqfs_system_info;username:PWideChar);[public,alias:'TYDQ_FS_SYSTEMINFO_DELETE_USER'];
 var i,j,size,size2,size3:natuint;
@@ -1317,15 +1482,15 @@ begin
    inc(i);
   end;
  if(i>sysinfo.header.tydqusercount) then exit;
- size:=sizeof(tydqfs_user_info)*sysinfo.header.tydqusercount;
+ size:=getmemsize(sysinfo.userinfolist);
  dec(sysinfo.header.tydqusercount);
  if(sysinfo.header.tydqusercount>0) then ReallocMem(sysinfo.userinfolist,sizeof(tydqfs_user_info)*sysinfo.header.tydqusercount);
  size2:=getmemsize((sysinfo.userinfolist+i-1)^.username); size3:=getmemsize((sysinfo.userinfolist+i-1)^.userpasswd);
  Wstrfree((sysinfo.userinfolist+i-1)^.userpasswd); Wstrfree((sysinfo.userinfolist+i-1)^.username);
  for j:=i+1 to sysinfo.header.tydqusercount+1 do
   begin
-   (sysinfo.userinfolist+j-1)^.username:=(sysinfo.userinfolist+j-1)^.username-(size+size2+size3) div sizeof(WideChar);
-   (sysinfo.userinfolist+j-1)^.userpasswd:=(sysinfo.userinfolist+j-1)^.userpasswd-(size+size2+size3) div sizeof(WideChar);
+   (sysinfo.userinfolist+j-1)^.username:=PWideChar(Pointer((sysinfo.userinfolist+j-1)^.username)-(size+size2+size3));
+   (sysinfo.userinfolist+j-1)^.userpasswd:=PWideChar(Pointer((sysinfo.userinfolist+j-1)^.userpasswd)-(size+size2+size3));
   end;
  if(sysinfo.header.tydqusercount=0) then sysinfo.userinfolist:=nil;
 end;
@@ -1358,7 +1523,55 @@ begin
   end;
  if(i>sysinfo.header.tydqusercount) then exit(0) else exit(i+1);
 end;
+function tydq_fs_systeminfo_get_manager_index(sysinfo:tydqfs_system_info):natuint;[public,alias:'TYDQ_FS_SYSTEMINFO_GET_MANAGER_INDEX'];
+var i:natuint;
 begin
- Wstrinit(tydqcurrentdiskname,256);
- Wstrinit(tydqcurrentpath,16384);
+ i:=1;
+ while(i<=sysinfo.header.tydqusercount) do
+  begin
+   if((sysinfo.userinfolist+i-1)^.usermanager) then break;
+   inc(i);
+  end;
+ if(i>sysinfo.header.tydqusercount) then exit(0) else exit(i+1);
+end;
+function tydq_fs_systeminfo_username_count(sysinfo:tydqfs_system_info;username:PWideChar):natuint;[public,alias:'TYDQ_FS_SYSTEMINFO_USERNAME_COUNT'];
+var i,res:natuint;
+begin
+ i:=1; res:=0;
+ while(i<=sysinfo.header.tydqusercount) do
+  begin
+   if(Wstrcmp((sysinfo.userinfolist+i-1)^.username,username)=0) and (Wstrlen(username)=Wstrlen((sysinfo.userinfolist+i-1)^.username)) then inc(res);
+   inc(i);
+  end;
+ tydq_fs_systeminfo_username_count:=res;
+end;
+procedure tydq_fs_systeminfo_free(var sysinfo:tydqfs_system_info);[public,alias:'TYDQ_FS_SYSTEMINFO_FREE'];
+var i,size:natuint;
+begin 
+ Wstrfree((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.userpasswd); 
+ Wstrfree((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.username); size:=0;
+ for i:=sysinfo.header.tydqusercount-1 downto 1 do
+  begin
+   size:=size+getmemsize((sysinfo.userinfolist+i-1)^.userpasswd)+getmemsize((sysinfo.userinfolist+i-1)^.username);
+   Wstrfree((sysinfo.userinfolist+i-1)^.userpasswd); Wstrfree((sysinfo.userinfolist+i-1)^.username);
+  end;
+ sysinfo.userinfolist:=Pointer(Pointer(sysinfo.userinfolist)-size);
+ freemem(sysinfo.userinfolist);
+ sysinfo.header.tydqusercount:=0; sysinfo.header.tydqsyslang:=0; sysinfo.header.tydqnetwork:=false; sysinfo.header.tydqgraphics:=false;
+end;
+function tydq_fs_legal_filename(filename:PWideChar):boolean;[public,alias:'TYDQ_FS_LEGAL_FILENAME'];
+const illegalchar:PWideChar=' ?*';
+var i,j,len,len2:natuint;
+begin
+ len:=Wstrlen(filename); len2:=Wstrlen(illegalchar);
+ for i:=1 to len do
+  begin
+   for j:=1 to len2 do
+    begin
+     if((filename+i-1)^=(illegalchar+j-1)^) then exit(false);
+    end;
+  end;
+ tydq_fs_legal_filename:=true;
+end;
+
 end.

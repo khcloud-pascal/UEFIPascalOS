@@ -1332,38 +1332,38 @@ const unused_entry_guid:efi_guid=(data1:$00000000;data2:$0000;data3:$0000;data4:
       capsule_flags_populate_system_table:dword=$00020000;
       capsule_flags_initiate_reset:dword=$00030000;
 
-function efi_error(status:efi_status):boolean;cdecl;
-function efi_get_platform:byte;cdecl;
-procedure efi_console_clear_screen(SystemTable:Pefi_system_table);cdecl;
-procedure efi_console_output_string(SystemTable:Pefi_system_table;outputstring:PWideChar);cdecl;
-procedure efi_set_watchdog_timer_to_null(SystemTable:Pefi_system_table);cdecl;
-procedure efi_console_read_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);cdecl;
-procedure efi_console_read_password_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);cdecl;
-procedure efi_console_enable_mouse(SystemTable:Pefi_system_table);cdecl;
-procedure efi_console_set_global_colour(SystemTable:Pefi_system_table;backgroundcolour:byte;textcolour:byte);cdecl;
-procedure efi_console_set_cursor_position(SystemTable:Pefi_system_table;column,row:natuint);cdecl;
-procedure efi_console_get_cursor_position(SystemTable:Pefi_system_table;var column,row:natuint);cdecl;
-procedure efi_console_get_max_row_and_max_column(SystemTable:Pefi_system_table;debug:boolean);cdecl;
-procedure efi_console_output_string_with_colour(SystemTable:Pefi_system_table;Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);cdecl;
-procedure efi_console_read_string_with_colour(SystemTable:Pefi_system_table;var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);cdecl;
-function efi_console_edit_text_total_line(outputstr,linefeed:PWideChar;mcolumn:natuint):natuint;cdecl;
-procedure efi_console_edit_text_output_string(SystemTable:Pefi_system_table;Outputstr,filename:PWideChar;startline:natuint;crow,ccolumn:natuint);cdecl;
-procedure efi_console_edit_text_file_content_string(Systemtable:Pefi_system_table;var ReadString:PWideChar;filename:PWideChar);cdecl;
-procedure efi_console_edit_hex_output_string(systemtable:Pefi_system_table;ReadData:PByte;ReadLength:natuint;filename:PWideChar;startline:natuint;ccolumn,crow:natuint);cdecl;
-procedure efi_console_edit_hex_content_string(systemtable:Pefi_system_table;var ReadData:PByte;var ReadLength:natuint;filename:PWideChar);cdecl;
+function efi_error(status:efi_status):boolean;
+function efi_get_platform:byte;
+procedure efi_console_clear_screen(SystemTable:Pefi_system_table);
+procedure efi_console_output_string(SystemTable:Pefi_system_table;outputstring:PWideChar);
+procedure efi_set_watchdog_timer_to_null(SystemTable:Pefi_system_table);
+procedure efi_console_read_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);
+procedure efi_console_read_password_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);
+procedure efi_console_enable_mouse(SystemTable:Pefi_system_table);
+procedure efi_console_set_global_colour(SystemTable:Pefi_system_table;backgroundcolour:byte;textcolour:byte);
+procedure efi_console_set_cursor_position(SystemTable:Pefi_system_table;column,row:natuint);
+procedure efi_console_get_cursor_position(SystemTable:Pefi_system_table;var column,row:natuint);
+procedure efi_console_get_max_row_and_max_column(SystemTable:Pefi_system_table;debug:boolean);
+procedure efi_console_output_string_with_colour(SystemTable:Pefi_system_table;Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);
+procedure efi_console_read_string_with_colour(SystemTable:Pefi_system_table;var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);
+function efi_console_edit_text_total_line(outputstr,linefeed:PWideChar;mcolumn:natuint):natuint;
+procedure efi_console_edit_text_output_string(SystemTable:Pefi_system_table;Outputstr,filename:PWideChar;startline:natuint;crow,ccolumn:natuint);
+procedure efi_console_edit_text_file_content_string(Systemtable:Pefi_system_table;var ReadString:PWideChar;filename:PWideChar);
+procedure efi_console_edit_hex_output_string(systemtable:Pefi_system_table;ReadData:PByte;ReadLength:natuint;filename:PWideChar;startline:natuint;ccolumn,crow:natuint);
+procedure efi_console_edit_hex_content_string(systemtable:Pefi_system_table;var ReadData:PByte;var ReadLength:natuint;filename:PWideChar);
 function efi_console_timer_mouse_blink(Event:efi_event;Context:Pointer):efi_status;cdecl;
-procedure efi_console_enable_mouse_blink(SystemTable:Pefi_system_table;enableblink:boolean;blinkmilliseconds:qword);cdecl;
-function efi_generate_guid(seed1,seed2:qword):efi_guid;cdecl;
-function efi_generate_fat32_volumeid(seed1:dword):dword;cdecl;
-function efi_list_all_file_system(SystemTable:Pefi_system_table;isreadonly:byte):efi_file_system_list;cdecl;
-function efi_list_all_file_system_ext(SystemTable:Pefi_system_table):efi_file_system_list_ext;cdecl;
-function efi_detect_disk_write_ability(SystemTable:Pefi_system_table):efi_disk_list;cdecl;
-procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;filesystemlist:efi_file_system_list;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);cdecl;
-procedure efi_install_cdrom_to_hard_disk_stage2(systemtable:Pefi_system_table;efslext:efi_file_system_list_ext;inscd,insdisk:natuint;const efipart:boolean);cdecl;
-procedure efi_system_restart_information_off(systemtable:Pefi_system_table;var mybool:boolean);cdecl;
-function efi_disk_empty_list(systemTable:Pefi_system_table):efi_disk_list;cdecl;
-function efi_disk_tydq_get_fs_list(systemTable:Pefi_system_table):efi_disk_list;cdecl;
-procedure efi_disk_tydq_set_fs(systemTable:Pefi_system_table;disknumber:natuint);cdecl;
+procedure efi_console_enable_mouse_blink(SystemTable:Pefi_system_table;enableblink:boolean;blinkmilliseconds:qword);
+function efi_generate_guid(seed1,seed2:qword):efi_guid;
+function efi_generate_fat32_volumeid(seed1:dword):dword;
+function efi_list_all_file_system(SystemTable:Pefi_system_table;isreadonly:byte):efi_file_system_list;
+function efi_list_all_file_system_ext(SystemTable:Pefi_system_table):efi_file_system_list_ext;
+function efi_detect_disk_write_ability(SystemTable:Pefi_system_table):efi_disk_list;
+procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;filesystemlist:efi_file_system_list;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);
+procedure efi_install_cdrom_to_hard_disk_stage2(systemtable:Pefi_system_table;efslext:efi_file_system_list_ext;inscd,insdisk:natuint;const efipart:boolean);
+procedure efi_system_restart_information_off(systemtable:Pefi_system_table;var mybool:boolean);
+function efi_disk_empty_list(systemTable:Pefi_system_table):efi_disk_list;
+function efi_disk_tydq_get_fs_list(systemTable:Pefi_system_table):efi_disk_list;
+procedure efi_disk_tydq_set_fs(systemTable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint);
 
 var maxcolumn:Natuint=80;
     maxrow:Natuint=25;
@@ -1381,17 +1381,17 @@ var maxcolumn:Natuint=80;
     fat32fs:fat32_file_system_info;
 
 implementation
-
-function efi_error(status:efi_status):boolean;cdecl;[public,alias:'EFI_ERROR'];
+uses tydqfs;
+function efi_error(status:efi_status):boolean;[public,alias:'EFI_ERROR'];
 begin
  if(natint(status)>=0) then efi_error:=false else if(natint(status)<0) then efi_error:=true;
 end;
-procedure efi_console_clear_screen(SystemTable:Pefi_system_table);cdecl;[public,alias:'EFI_CONSOLE_CLEAR_SCREEN'];
+procedure efi_console_clear_screen(SystemTable:Pefi_system_table);[public,alias:'EFI_CONSOLE_CLEAR_SCREEN'];
 begin
  SystemTable^.ConOut^.ClearScreen(SystemTable^.ConOut);
  currentcolumn:=0; currentrow:=0;
 end;
-function efi_get_platform:byte;cdecl;[public,alias:'EFI_GET_PLATFORM'];
+function efi_get_platform:byte;[public,alias:'EFI_GET_PLATFORM'];
 begin
  {$IFDEF CPUX86_64}
  efi_get_platform:=0;
@@ -1403,7 +1403,7 @@ begin
  efi_get_platform:=2;
  {$ENDIF}
 end;
-procedure efi_console_output_string(SystemTable:Pefi_system_table;outputstring:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_OUTPUT_STRING'];
+procedure efi_console_output_string(SystemTable:Pefi_system_table;outputstring:PWideChar);[public,alias:'EFI_CONSOLE_OUTPUT_STRING'];
 var mychar:array[1..2] of WideChar;
     i,len:Natuint;
 begin
@@ -1432,7 +1432,7 @@ begin
       begin
        mychar[1]:=(outputstring+i-1)^;
        mychar[2]:=#0;
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar[1]);
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
        inc(currentcolumn); inc(i,1);
       end;
     end
@@ -1447,7 +1447,7 @@ begin
       begin
        mychar[1]:=(outputstring+i-1)^;
        mychar[2]:=#0;
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar[1]);
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
        inc(currentcolumn); inc(i,1);
       end;
     end;
@@ -1462,7 +1462,7 @@ begin
   end;
  efi_console_set_cursor_position(SystemTable,currentcolumn,currentrow);
 end;
-procedure efi_console_output_string_with_colour(SystemTable:Pefi_system_table;Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);cdecl;[public,alias:'EFI_CONSOLE_OUTPUT_STRING_WITH_COLOUR'];
+procedure efi_console_output_string_with_colour(SystemTable:Pefi_system_table;Outputstring:PWideChar;backgroundcolour:byte;textcolour:byte);[public,alias:'EFI_CONSOLE_OUTPUT_STRING_WITH_COLOUR'];
 var mychar:array[1..2] of WideChar;
     i,len:Natuint;
 begin
@@ -1491,7 +1491,7 @@ begin
       begin
        mychar[1]:=(outputstring+i-1)^;
        mychar[2]:=#0;
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar[1]);
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
        inc(currentcolumn); inc(i,1);
       end;
     end
@@ -1506,7 +1506,7 @@ begin
       begin
        mychar[1]:=(outputstring+i-1)^;
        mychar[2]:=#0;
-       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar[1]);
+       SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,@mychar);
        inc(currentcolumn); inc(i,1);
       end;
     end;
@@ -1521,21 +1521,21 @@ begin
   end;
  efi_console_set_cursor_position(SystemTable,currentcolumn,currentrow);
 end;
-procedure efi_set_watchdog_timer_to_null(SystemTable:Pefi_system_table);cdecl;[public,alias:'EFI_SET_WATCHDOG_TIMER_TO_NULL'];
+procedure efi_set_watchdog_timer_to_null(SystemTable:Pefi_system_table);[public,alias:'EFI_SET_WATCHDOG_TIMER_TO_NULL'];
 begin
  SystemTable^.bootservices^.SetWatchDogTimer(0,0,0,nil);
 end;
-procedure efi_console_read_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_READ_STRING'];
+procedure efi_console_read_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);[public,alias:'EFI_CONSOLE_READ_STRING'];
 var key:efi_input_key;
     waitidx,i,j:natuint;
 begin
  SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,consolebck shl 4+consoletex);
  if(ReadString<>nil) then freemem(ReadString);
- Readstring:=getmem(sizeof(WideChar)*1025); i:=0;
+ Readstring:=allocmem(sizeof(WideChar)); i:=0;
  while (True) do
   begin
    inc(i);
-   if(i>1024) then break;
+   ReallocMem(ReadString,(i+1)*sizeof(WideChar));
    SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
    SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
    if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
@@ -1579,17 +1579,17 @@ begin
    efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
   end;
 end;
-procedure efi_console_read_password_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_READ_PASSWORD_STRING'];
+procedure efi_console_read_password_string(SystemTable:Pefi_system_table;var ReadString:PWideChar);[public,alias:'EFI_CONSOLE_READ_PASSWORD_STRING'];
 var key:efi_input_key;
     waitidx,i,j:natuint;
 begin
  SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,consolebck shl 4+consoletex);
  if(ReadString<>nil) then freemem(ReadString);
- Readstring:=getmem(sizeof(WideChar)*1025); i:=0;
+ Readstring:=allocmem(sizeof(WideChar)); i:=0;
  while (True) do
   begin
    inc(i);
-   if(i>1024) then break;
+   ReallocMem(ReadString,(i+1)*sizeof(WideChar));
    SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
    SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
    if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
@@ -1619,17 +1619,17 @@ begin
    efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
   end;
 end;
-procedure efi_console_read_string_with_colour(SystemTable:Pefi_system_table;var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);cdecl;[public,alias:'EFI_CONSOLE_READ_STRING_WITH_COLOUR'];
+procedure efi_console_read_string_with_colour(SystemTable:Pefi_system_table;var ReadString:PWideChar;backgroundcolour:byte;textcolour:byte);[public,alias:'EFI_CONSOLE_READ_STRING_WITH_COLOUR'];
 var key:efi_input_key;
     waitidx,i,j:natuint;
 begin
  SystemTable^.ConOut^.SetAttribute(SystemTable^.ConOut,backgroundcolour shl 4+textcolour);
  if(ReadString<>nil) then freemem(ReadString);
- Readstring:=getmem(sizeof(WideChar)*1025); i:=0;
+ Readstring:=allocmem(sizeof(WideChar)); i:=0;
  while (True) do
   begin
    inc(i);
-   if(i>1024) then break;
+   ReallocMem(ReadString,(i+1)*sizeof(WideChar));
    SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
    SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
    if(key.ScanCode=0) then (ReadString+i-1)^:=key.UnicodeChar else (ReadString+i-1)^:=#0;
@@ -1673,7 +1673,7 @@ begin
    efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
   end;
 end;
-function efi_console_edit_text_total_line(outputstr,linefeed:PWideChar;mcolumn:natuint):natuint;cdecl;[public,alias:'EFI_CONSOLE_EDIT_TEXT_TOTAL_LINE'];
+function efi_console_edit_text_total_line(outputstr,linefeed:PWideChar;mcolumn:natuint):natuint;[public,alias:'EFI_CONSOLE_EDIT_TEXT_TOTAL_LINE'];
 var pos1,pos2,pos3,mylen1,mylen2,res:natuint;
 begin
  pos1:=1; pos2:=2; res:=0; mylen1:=Wstrlen(outputstr); mylen2:=Wstrlen(linefeed);
@@ -1693,7 +1693,7 @@ begin
   end;
  efi_console_edit_text_total_line:=res;
 end;
-procedure efi_console_edit_text_output_string(SystemTable:Pefi_system_table;outputstr,filename:PWideChar;startline:natuint;crow,ccolumn:natuint);cdecl;[public,alias:'EFI_CONSOLE_EDIT_TEXT_OUTPUT_STRING'];
+procedure efi_console_edit_text_output_string(SystemTable:Pefi_system_table;outputstr,filename:PWideChar;startline:natuint;crow,ccolumn:natuint);[public,alias:'EFI_CONSOLE_EDIT_TEXT_OUTPUT_STRING'];
 var i,j,len,pos,lcount,endline,mysize1,mysize2:natuint;
     lpos1,lpos2:^natuint;
     partstr,partstr2:PWideChar;
@@ -1804,7 +1804,7 @@ begin
  efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
  freemem(lpos2); freemem(lpos1);
 end;
-procedure efi_console_edit_text_file_content_string(Systemtable:Pefi_system_table;var ReadString:PWideChar;filename:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_EDIT_TEXT_FILE_CONTENT_STRING'];
+procedure efi_console_edit_text_file_content_string(Systemtable:Pefi_system_table;var ReadString:PWideChar;filename:PWideChar);[public,alias:'EFI_CONSOLE_EDIT_TEXT_FILE_CONTENT_STRING'];
 var key:efi_input_key;
     i,j,waitidx,asrow,ascolumn,acolumn,arow,apos,plen,dlen:natuint;
     sc:word;
@@ -1990,7 +1990,7 @@ begin
    efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
   end;
 end;
-procedure efi_console_edit_hex_output_string(systemtable:Pefi_system_table;ReadData:PByte;ReadLength:natuint;filename:PWideChar;startline:natuint;ccolumn,crow:natuint);cdecl;[public,alias:'EFI_CONSOLE_EDIT_HEX_OUTPUT_STRING'];
+procedure efi_console_edit_hex_output_string(systemtable:Pefi_system_table;ReadData:PByte;ReadLength:natuint;filename:PWideChar;startline:natuint;ccolumn,crow:natuint);[public,alias:'EFI_CONSOLE_EDIT_HEX_OUTPUT_STRING'];
 var startpos,endpos,i,len:natuint;
     partstr:PwideChar;
 begin
@@ -2041,7 +2041,7 @@ begin
    if(i mod (maxcolumn div 3)=1) and (i<=endpos) then SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
   end;
 end;
-procedure efi_console_edit_hex_content_string(systemtable:Pefi_system_table;var ReadData:PByte;var ReadLength:natuint;filename:PWideChar);cdecl;[public,alias:'EFI_CONSOLE_EDIT_HEX_CONTENT_STRING'];
+procedure efi_console_edit_hex_content_string(systemtable:Pefi_system_table;var ReadData:PByte;var ReadLength:natuint;filename:PWideChar);[public,alias:'EFI_CONSOLE_EDIT_HEX_CONTENT_STRING'];
 const hexc1:PWideChar='0123456789ABCDEF';
       hexc2:PWideChar='0123456789abcdef';
 var key:efi_input_key;
@@ -2177,24 +2177,24 @@ begin
    efi_console_set_cursor_position(systemtable,currentcolumn,currentrow);
   end;
 end;
-procedure efi_console_enable_mouse(SystemTable:Pefi_system_table);cdecl;[public,alias:'EFI_CONSOLE_ENABLE_MOUSE'];
+procedure efi_console_enable_mouse(SystemTable:Pefi_system_table);[public,alias:'EFI_CONSOLE_ENABLE_MOUSE'];
 begin
  SystemTable^.ConOut^.EnableCursor(SystemTable^.ConOut,true);
 end;
-procedure efi_console_set_global_colour(SystemTable:Pefi_system_table;backgroundcolour:byte;textcolour:byte);cdecl;[public,alias:'EFI_CONSOLE_SET_GLOBAL_COLOUR'];
+procedure efi_console_set_global_colour(SystemTable:Pefi_system_table;backgroundcolour:byte;textcolour:byte);[public,alias:'EFI_CONSOLE_SET_GLOBAL_COLOUR'];
 begin
  consolebck:=backgroundcolour; consoletex:=textcolour;
 end;
-procedure efi_console_set_cursor_position(SystemTable:Pefi_system_table;column,row:natuint);cdecl;[public,alias:'EFI_CONSOLE_SET_CURSOR_POSITION'];
+procedure efi_console_set_cursor_position(SystemTable:Pefi_system_table;column,row:natuint);[public,alias:'EFI_CONSOLE_SET_CURSOR_POSITION'];
 begin
  SystemTable^.ConOut^.SetCursorPosition(SystemTable^.ConOut,column,row);
 end;
-procedure efi_console_get_cursor_position(SystemTable:Pefi_system_table;var column,row:natuint);cdecl;[public,alias:'EFI_CONSOLE_GET_CURSOR_POSITION'];
+procedure efi_console_get_cursor_position(SystemTable:Pefi_system_table;var column,row:natuint);[public,alias:'EFI_CONSOLE_GET_CURSOR_POSITION'];
 begin
  column:=SystemTable^.ConOut^.Mode^.Cursorcolumn;
  row:=SystemTable^.ConOut^.Mode^.CursorRow;
 end;
-procedure efi_console_get_max_row_and_max_column(SystemTable:Pefi_system_table;debug:boolean);cdecl;[public,alias:'EFI_CONSOLE_GET_MAX_ROW_AND_MAX_COLUMN'];
+procedure efi_console_get_max_row_and_max_column(SystemTable:Pefi_system_table;debug:boolean);[public,alias:'EFI_CONSOLE_GET_MAX_ROW_AND_MAX_COLUMN'];
 var maxc,maxr:Natuint;
     status:natint;
     i:byte;
@@ -2243,7 +2243,7 @@ begin
    CursorBlinkVisible:=true;
   end;
 end;
-procedure efi_console_enable_mouse_blink(SystemTable:Pefi_system_table;enableblink:boolean;blinkmilliseconds:qword);cdecl;[public,alias:'EFI_CONSOLE_ENABLE_MOUSE_BLINK'];
+procedure efi_console_enable_mouse_blink(SystemTable:Pefi_system_table;enableblink:boolean;blinkmilliseconds:qword);[public,alias:'EFI_CONSOLE_ENABLE_MOUSE_BLINK'];
 begin
  if(enableblink=true) and (Cursorblinkevent=nil) then
   begin
@@ -2256,7 +2256,7 @@ begin
    Cursorblinkevent:=nil;
   end;
 end;
-function efi_generate_guid(seed1:qword;seed2:qword):efi_guid;cdecl;[public,alias:'EFI_GENERATE_GUID'];
+function efi_generate_guid(seed1:qword;seed2:qword):efi_guid;[public,alias:'EFI_GENERATE_GUID'];
 var resguid:efi_guid;
     i:byte;
     mseed1:dword;
@@ -2273,13 +2273,13 @@ begin
  for i:=1 to 8 do resguid.data4[i]:=mseed4[i] div 11*8+18;
  efi_generate_guid:=resguid;
 end;
-function efi_generate_fat32_volumeid(seed1:dword):dword;cdecl;[public,alias:'EFI_GENERATE_FAT32_VOLUMEID'];
+function efi_generate_fat32_volumeid(seed1:dword):dword;[public,alias:'EFI_GENERATE_FAT32_VOLUMEID'];
 var res:dword;
 begin
  res:=(seed1+seed1 div 17*9+seed1 div 127*110) div 3;
  efi_generate_fat32_volumeid:=res;
 end;
-function efi_list_all_file_system(SystemTable:Pefi_system_table;isreadonly:byte):efi_file_system_list;cdecl;[public,alias:'EFI_LIST_ALL_FILE_SYSTEM'];
+function efi_list_all_file_system(SystemTable:Pefi_system_table;isreadonly:byte):efi_file_system_list;[public,alias:'EFI_LIST_ALL_FILE_SYSTEM'];
 var totalnum,i:natuint;
     totalbuf:Pefi_handle;
     sfspp:Pointer;
@@ -2314,7 +2314,7 @@ begin
   end;
  efi_list_all_file_system:=data;
 end;
-function efi_list_all_file_system_ext(SystemTable:Pefi_system_table):efi_file_system_list_ext;cdecl;[public,alias:'EFI_LIST_ALL_FILE_SYSTEM_EXT'];
+function efi_list_all_file_system_ext(SystemTable:Pefi_system_table):efi_file_system_list_ext;[public,alias:'EFI_LIST_ALL_FILE_SYSTEM_EXT'];
 var totalnum,i,j:natuint;
     status:efi_status;
     totalbuf:Pefi_handle;
@@ -2357,12 +2357,11 @@ begin
   end;
  efi_list_all_file_system_ext:=data;
 end;
-function efi_detect_disk_write_ability(SystemTable:Pefi_system_table):efi_disk_list;cdecl;[public,alias:'EFI_DETECT_DISK_WRITE_ABILITY'];
+function efi_detect_disk_write_ability(SystemTable:Pefi_system_table):efi_disk_list;[public,alias:'EFI_DETECT_DISK_WRITE_ABILITY'];
 var tnum1,tnum2,i:natuint;
     tbuf1,tbuf2:Pefi_handle;
     p1,p2:Pointer;
-    mydata1:PNatuint;
-    mydata2:natuint;
+    mydata1,mydata2:natuint;
     reslist:efi_disk_list;
     status:efi_status;
 begin
@@ -2375,13 +2374,12 @@ begin
   begin
    SystemTable^.BootServices^.HandleProtocol((tbuf1+i-1)^,@efi_disk_io_protocol_guid,p1);
    SystemTable^.BootServices^.HandleProtocol((tbuf2+i-1)^,@efi_block_io_protocol_guid,p2);
-   mydata1:=allocmem(8);
-   mydata1^:=1012;
-   Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,8,mydata2);
-   status:=Pefi_disk_io_protocol(p1)^.WriteDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,8,mydata1);
+   mydata1:=$5D47291AD7E3F2B1;
+   Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,sizeof(natuint),mydata2);
+   status:=Pefi_disk_io_protocol(p1)^.WriteDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,sizeof(natuint),@mydata1);
    if(status=efi_success) then
     begin
-     Pefi_disk_io_protocol(p1)^.WriteDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,8,@mydata2);
+     Pefi_disk_io_protocol(p1)^.WriteDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,sizeof(natuint),@mydata2);
      Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,sizeof(master_boot_record),rmbr);
      Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,
      Pefi_block_io_protocol(p2)^.Media^.BlockSize,Pefi_block_io_protocol(p2)^.Media^.BlockSize,rgpt1);
@@ -2393,11 +2391,10 @@ begin
      (reslist.disk_content+reslist.disk_count-1)^:=Pefi_disk_io_protocol(p1);
      (reslist.disk_block_content+reslist.disk_count-1)^:=Pefi_block_io_protocol(p2);
     end;
-   freemem(mydata1);
   end;
  efi_detect_disk_write_ability:=reslist;
 end;
-procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;filesystemlist:efi_file_system_list;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);cdecl;[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK'];
+procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;filesystemlist:efi_file_system_list;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK'];
 var i,j,lastblock,blocksize,mediaid,diskwritepos,FirstDataSector:natuint;
     tmpv1,tmpv2,tmpv3:natuint;
     zero:byte;
@@ -2595,7 +2592,7 @@ begin
     end;
   end;
 end;
-procedure efi_install_cdrom_to_hard_disk_stage2(systemtable:Pefi_system_table;efslext:efi_file_system_list_ext;inscd,insdisk:natuint;const efipart:boolean);cdecl;[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK_STAGE2'];
+procedure efi_install_cdrom_to_hard_disk_stage2(systemtable:Pefi_system_table;efslext:efi_file_system_list_ext;inscd,insdisk:natuint;const efipart:boolean);[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK_STAGE2'];
 var fsp1,fsp2:Pefi_simple_file_system_protocol;
     fp1,fp2,fp3:Pefi_file_protocol;
     fpinfo:efi_file_info;
@@ -2662,7 +2659,7 @@ begin
  fp1^.Close(fp1); 
  fp2^.Close(fp2);
 end;
-procedure efi_system_restart_information_off(systemtable:Pefi_system_table;var mybool:boolean);cdecl;[public,alias:'EFI_SYSTEM_RESTART_INFORMATION_OFF'];
+procedure efi_system_restart_information_off(systemtable:Pefi_system_table;var mybool:boolean);[public,alias:'EFI_SYSTEM_RESTART_INFORMATION_OFF'];
 var edl:efi_disk_list;
     procdisk:Pefi_disk_io_protocol;
     procblock:Pefi_block_io_protocol;
@@ -2685,12 +2682,12 @@ begin
     end;
   end;
 end;
-function efi_disk_empty_list(systemTable:Pefi_system_table):efi_disk_list;cdecl;[public,alias:'EFI_DISK_EMPTY_LIST'];
+function efi_disk_empty_list(systemTable:Pefi_system_table):efi_disk_list;[public,alias:'EFI_DISK_EMPTY_LIST'];
 var edl,redl:efi_disk_list;
     procdisk:Pefi_disk_io_protocol;
     procblock:Pefi_block_io_protocol;
     data:qword;
-    i:natuint;
+    i,size:natuint;
 begin
  edl:=efi_detect_disk_write_ability(systemtable); 
  redl.disk_count:=0;
@@ -2707,14 +2704,18 @@ begin
      (redl.disk_block_content+redl.disk_count-1)^:=procblock;
     end;
   end;
+ size:=getmemsize(edl.disk_content)+getmemsize(edl.disk_block_content);
+ freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
+ redl.disk_block_content:=Pointer(Pointer(redl.disk_block_content)-size);
+ redl.disk_content:=Pointer(Pointer(redl.disk_content)-size);
  efi_disk_empty_list:=redl;
 end;
-function efi_disk_tydq_get_fs_list(systemTable:Pefi_system_table):efi_disk_list;cdecl;[public,alias:'EFI_DISK_TYDQ_FS_LIST'];
+function efi_disk_tydq_get_fs_list(systemTable:Pefi_system_table):efi_disk_list;[public,alias:'EFI_DISK_TYDQ_FS_LIST'];
 var edl,redl:efi_disk_list;
     procdisk:Pefi_disk_io_protocol;
     procblock:Pefi_block_io_protocol;
-    data:qword;
-    i:natuint;
+    fsh:tydqfs_header;
+    i,size:natuint;
 begin
  edl:=efi_detect_disk_write_ability(systemtable); 
  redl.disk_count:=0;
@@ -2722,28 +2723,35 @@ begin
  redl.disk_block_content:=allocmem(sizeof(Pointer)*1024);
  for i:=1 to edl.disk_count do
   begin
-   procdisk:=(edl.disk_content+i-1)^; procblock:=(edl.disk_block_content+i-1)^;
-   procdisk^.ReadDisk(procdisk,procblock^.Media^.MediaId,0,8,data);
-   if(data=$5D47291AD7E3F2B1) then 
+   procdisk:=(edl.disk_content+i-1)^;
+   procblock:=(edl.disk_block_content+i-1)^;
+   procdisk^.ReadDisk(procdisk,procblock^.Media^.MediaId,0,sizeof(tydqfs_header),fsh);
+   if(fsh.signature=$5D47291AD7E3F2B1) then 
     begin
      inc(redl.disk_count);
      (redl.disk_content+redl.disk_count-1)^:=procdisk;
      (redl.disk_block_content+redl.disk_count-1)^:=procblock;
     end;
   end;
+ size:=getmemsize(edl.disk_block_content)+getmemsize(edl.disk_content);
+ freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
+ redl.disk_block_content:=Pointer(Pointer(redl.disk_block_content)-size);
+ redl.disk_content:=Pointer(Pointer(redl.disk_content)-size);
  efi_disk_tydq_get_fs_list:=redl;
 end;
-procedure efi_disk_tydq_set_fs(systemTable:Pefi_system_table;disknumber:natuint);cdecl;[public,alias:'EFI_DISK_TYDQ_SET_FS'];
-var edl:efi_disk_list;
-    pdisk:Pefi_disk_io_protocol;
-    pblock:Pefi_block_io_protocol;
-    wdata:qword;
+procedure efi_disk_tydq_set_fs(systemTable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint);[public,alias:'EFI_DISK_TYDQ_SET_FS'];
+var fsh:tydqfs_header;
+    dp:Pefi_disk_io_protocol;
+    bp:Pefi_block_io_protocol;
 begin
- edl:=efi_disk_empty_list(systemtable);
- pdisk:=(edl.disk_content+disknumber-1)^;
- pblock:=(edl.disk_block_content+disknumber-1)^;
- wdata:=$5D47291AD7E3F2B1;
- pdisk^.WriteDisk(pdisk,pblock^.Media^.MediaId,0,8,@wdata);
+ if(diskindex>edl.disk_count) then exit;
+ dp:=(edl.disk_content+diskindex-1)^; bp:=(edl.disk_block_content+diskindex-1)^;
+ fsh.signature:=$5D47291AD7E3F2B1;
+ fsh.maxsize:=(bp^.Media^.LastBlock+1)*bp^.Media^.BlockSize;
+ fsh.usedsize:=sizeof(tydqfs_header);
+ fsh.RootName[1]:=#0;
+ fsh.RootCount:=0;
+ dp^.WriteDisk(dp,bp^.Media^.MediaId,0,sizeof(tydqfs_header),@fsh);
 end;
 
 end.

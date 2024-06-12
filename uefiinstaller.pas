@@ -227,10 +227,26 @@ begin
             end
            else
             begin
-             efi_console_output_string(systemtable,'The Disk Name is(Name length DO NOT exceeds to 255):');
+             edl3:=efi_disk_tydq_get_fs_list(systemtable);
+             efi_console_output_string(systemtable,'Type the disk ');
+             efi_console_output_string(systemtable,UintToPWChar(i));
+             efi_console_output_string(systemtable,#39's name(Name length DO NOT exceeds to 255):');
              efi_console_read_string(systemtable,mystr);
-             efi_disk_tydq_set_fs(systemtable,emptyindex);
+             while(Wstrlen(mystr)>255) or (Wstrlen(mystr)=0) or (tydq_fs_disk_exists(edl3,mystr)=true) or (tydq_fs_legal_filename(mystr)=false) do 
+              begin
+               if(Wstrlen(mystr)>255) or (Wstrlen(mystr)=0) then efi_console_output_string(systemtable,'Error:Disk name exceeds 255.'#13#10)
+               else if(tydq_fs_disk_exists(edl3,mystr)=true) then efi_console_output_string(systemtable,'Error:Disk name exists.'#13#10)
+               else if(tydq_fs_legal_filename(mystr)=false) then 
+               efi_console_output_string(systemtable,'Error:Disk name illegal,please modify the new disk name(space,* or ? are illegal).'#10);
+               efi_console_output_string(systemtable,'Type the disk ');
+               efi_console_output_string(systemtable,UintToPWChar(i));
+               efi_console_output_string(systemtable,#39's name(Name length DO NOT exceeds to 255):');
+               efi_console_read_string(systemtable,mystr);
+              end;
+             efi_disk_tydq_set_fs(systemtable,edl2,emptyindex);
              tydq_fs_initialize(edl2,emptyindex,mystr);
+             Wstrfree(mystr); freemem(edl3.disk_block_content); freemem(edl3.disk_content); edl3.disk_count:=0;
+             edl3:=efi_disk_tydq_get_fs_list(systemtable);
              if(edl3.disk_count>0) and (havesysinfo=false) then 
               begin
                efi_console_output_string(systemtable,'Do you want to specify this disk as system disk?'#10);
@@ -244,15 +260,18 @@ begin
                   begin
                    efi_console_output_string(systemtable,'You need a user account to enter the installed system,So you need to create a account.'#10);
       		   efi_console_output_string(systemtable,'Do you want to create the account immediately or create it later(Y or y is yes,other is no)?'#10);
+      		   efi_console_output_string(systemtable,'The first account will be automatically set to be user manager.'#10);
                    efi_console_output_string(systemtable,'Your answer:');
                    efi_console_read_string(systemtable,mystr);
                    if((WstrCmp(mystr,'Y')=0) or (WstrCmp(mystr,'y')=0)) and (Wstrlen(mystr)=1) then
                     begin
                      efi_console_output_string(systemtable,'Set your account name(Name length must be in 1-128):');
                      efi_console_read_string(systemtable,mystr);
-                   while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) do
+                   while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) or (tydq_fs_legal_filename(mystr)=false) do
                     begin
-                     efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10);
+                     if(tydq_fs_legal_filename(mystr)=false) then
+                     efi_console_output_string(systemtable,'Error:Account name is illegal(space,* or ? is illegal character).'#10)
+                     else efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10);
                      efi_console_output_string(systemtable,'Set your account name:');
                      efi_console_read_string(systemtable,mystr);
                     end;
@@ -272,8 +291,8 @@ begin
                     efi_console_output_string(systemtable,'Verify your account password:');
                     efi_console_read_password_string(systemtable,mystr3);
                    end;
-                   tydq_fs_systeminfo_add_user(fsi,mystr,mystr2);
-                   tydq_fs_systeminfo_write(systemtable,edl2,fsi);
+                   tydq_fs_systeminfo_add_user(fsi,mystr,mystr2,true);
+                   tydq_fs_systeminfo_write(systemtable,edl3,fsi);
                    Wstrfree(mystr3); Wstrfree(mystr2);
                   end;
                   Wstrfree(mystr);
@@ -421,17 +440,21 @@ begin
              efi_console_output_string(systemtable,UintToPWChar(i));
              efi_console_output_string(systemtable,#39's name(Name length DO NOT exceeds to 255):');
              efi_console_read_string(systemtable,mystr);
-             while(Wstrlen(mystr)>255) or (tydq_fs_disk_exists(edl3,mystr)=true) do
+             while(Wstrlen(mystr)>255) or (Wstrlen(mystr)=0) or (tydq_fs_disk_exists(edl3,mystr)=true) or (tydq_fs_legal_filename(mystr)=false) do 
               begin
-               if(Wstrlen(mystr)>255) then efi_console_output_string(systemtable,'Error:Disk name exceeds 255.'#13#10)
-               else if(tydq_fs_disk_exists(edl3,mystr)=true) then efi_console_output_string(systemtable,'Error:Disk name exists.'#13#10);
+               if(Wstrlen(mystr)>255) or (Wstrlen(mystr)=0) then efi_console_output_string(systemtable,'Error:Disk name exceeds 255.'#13#10)
+               else if(tydq_fs_disk_exists(edl3,mystr)=true) then efi_console_output_string(systemtable,'Error:Disk name exists.'#13#10)
+               else if(tydq_fs_legal_filename(mystr)=false) then 
+               efi_console_output_string(systemtable,'Error:Disk name illegal,please modify the new disk name(space,* or ? are illegal).'#10);
                efi_console_output_string(systemtable,'Type the disk');
                efi_console_output_string(systemtable,UintToPWChar(i));
                efi_console_output_string(systemtable,#39's name(Name length DO NOT exceeds to 255):');
                efi_console_read_string(systemtable,mystr);
               end;
-             efi_disk_tydq_set_fs(systemtable,emptyindex);
+             efi_disk_tydq_set_fs(systemtable,edl2,emptyindex);
              tydq_fs_initialize(edl2,emptyindex,mystr);
+             Wstrfree(mystr); freemem(edl3.disk_block_content); freemem(edl3.disk_content); edl3.disk_count:=0;
+             edl3:=efi_disk_tydq_get_fs_list(systemtable);
              if(edl3.disk_count>0) and (havesysinfo=false) then 
               begin
                efi_console_output_string(systemtable,'Do you want to specify this disk as system disk?'#10);
@@ -445,15 +468,18 @@ begin
                   begin
                    efi_console_output_string(systemtable,'You need a user account to enter the installed system,So you need to create a account.'#10);
       		   efi_console_output_string(systemtable,'Do you want to create the account immediately or create it later(Y or y is yes,other is no)?'#10);
+      		   efi_console_output_string(systemtable,'The first account will be automatically set to be user manager.'#10);
                    efi_console_output_string(systemtable,'Your answer:');
                    efi_console_read_string(systemtable,mystr);
                    if((WstrCmp(mystr,'Y')=0) or (WstrCmp(mystr,'y')=0)) and (Wstrlen(mystr)=1) then
                     begin
                      efi_console_output_string(systemtable,'Set your account name(Name length must be in 1-128):');
                      efi_console_read_string(systemtable,mystr);
-                   while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) do
+                   while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) or (tydq_fs_legal_filename(mystr)=false) do
                     begin
-                     efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10);
+                     if(tydq_fs_legal_filename(mystr)=false) then
+                     efi_console_output_string(systemtable,'Error:Account name is illegal(space,* or ? is illegal character).'#10)
+                     else efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10);
                      efi_console_output_string(systemtable,'Set your account name:');
                      efi_console_read_string(systemtable,mystr);
                     end;
@@ -473,7 +499,7 @@ begin
                     efi_console_output_string(systemtable,'Verify your account password:');
                     efi_console_read_password_string(systemtable,mystr3);
                    end;
-                   tydq_fs_systeminfo_add_user(fsi,mystr,mystr2);
+                   tydq_fs_systeminfo_add_user(fsi,mystr,mystr2,true);
                    tydq_fs_systeminfo_write(systemtable,edl2,fsi);
                    Wstrfree(mystr3); Wstrfree(mystr2);
                   end;
