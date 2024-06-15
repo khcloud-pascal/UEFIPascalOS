@@ -323,7 +323,8 @@ begin
  efi_console_output_string(systemtable,'Wait for 10 seconds to enter TYDQ system!'#10);
  SystemTable^.BootServices^.Stall(10000);
  efi_console_clear_screen(systemtable);
- efi_console_output_string(systemtable,'Type the commands to operate the TYDQ System(type help <command> for help!)'#13#10);
+ efi_console_output_string(systemtable,'Type the commands to operate the TYDQ System(type help <command> for help!)'#10);
+ efi_console_output_string(systemtable,'Warning:every commands need to have a space to deliter!'#10);
  if(fsi.header.tydqgraphics=false) then console_main(systemtable,fsi,fsiindex);
  freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
  SystemTable^.RuntimeServices^.ResetSystem(EfiResetShutDown,efi_success,0,nil);
