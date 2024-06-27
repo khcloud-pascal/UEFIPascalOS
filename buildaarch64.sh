@@ -6,7 +6,7 @@
 	/home/tydq/source/compiler/ppca64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg -Twin64 uefiinstaller.pas
 	/home/tydq/source/compiler/ppca64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg -Twin64 uefimain.pas
 	objcopy -O efi-app-aarch64 uefiinstaller.dll installer/bootaa64.efi
-	objcopy -O efi-app-aarch64 uefimain.dll kernel/bootaa64.efi
+	objcopy -O efi-app-aarch64 uefimain.dll kernel/Sysmainaa64.efi
 	rm -rf *.o
 	rm -rf *.ppu
 	rm -rf *.dll

@@ -1,7 +1,6 @@
 unit system;
 {$MODE FPC}
 
-{$POINTERMATH ON}
 interface
 
 {$IFDEF CPU32}
@@ -16,7 +15,11 @@ type
   Char = #0..#255;
   DWord = LongWord;
   Cardinal = LongWord;
+  {$IFDEF CPU16}
   Integer = SmallInt;
+  {$ELSE CPU16}
+  Integer = Longint;
+  {$ENDIF CPU16}
   UInt64 = QWord;
   Pbyte=^byte;
   Pchar=^char;
@@ -34,11 +37,25 @@ type
   PNatUint=^dword;
   Natint=integer;
   PNatint=^integer;
+  Uint128=record
+          Dwords:array[1..4] of dword;
+          end;
+  Int128=record
+         Highdword:Integer;
+         Lowdwords:array[1..3] of dword;
+         end;
   {$ELSE CPU32}
   NatUint=qword;
   PNatUint=^qword;
   Natint=int64;
   PNatint=^int64;
+  Uint128=record
+          High,Low:qword;
+          end;
+  Int128=record
+         High:Int64;
+         Low:qword;
+         end;
   {$ENDIF CPU32}
   TTypeKind = (tkUnknown, tkInteger, tkChar, tkEnumeration, tkFloat, tkSet,
     tkMethod, tkSString, tkLString, tkAString, tkWString, tkVariant, tkArray,
@@ -126,6 +143,7 @@ type
                end;
 const mypwd:PChar='PHjueigbEYywLCQiCYRQGleDMUjOceLMBFDMJHEMUzgCleRgkKEnAuVLtSAEFSFhevpEKomPHIbaqxLLGJVMRmZUDFKnvHGfvTwYEOqVaBxEGXMXXuITZixUcMbdTCfWIwysKPSciOnUHgmePRWEWWcNMuePEbGOvNgNbqdMMRlzbocTikuCuQuISgQTWFtVSLUmAObgipXAnNEdUNXKVFBiNTIOornretCNOaEwhQTdIRlYaldWzFiummYKKJJcnDRJovDJTFXpQczJQBDnATyvopuBakmGKXTDsIhKfKNITJlsDkLTlKRKfObLvwpIgXvqmBmiWLKQlhqMyAcUoFxkFNPYeGFCduhGJTNtSMfvbGuupWzugWNrwwZKkwjfIqIdjXMAiVONPcMebzSCvUGtVblwohLzOhlnPKIQBTxpBYufIJesKHeZPUHiYaofkTEDcpRapVwluKFARevxkgjxuEFHgVEuQtAUFMMTszCgrqcuKFnJiZtmDBmYsatb';
 mypwdoffset:array[1..24] of shortint=(-1,-3,-6,-8,-7,-4,-5,-2,0,8,9,10,12,2,3,4,1,9,-9,3,-11,-12,10,-7);
+pi:extended=3.1415926;
 procedure fpc_handleerror;compilerproc;
 procedure fpc_lib_exit;compilerproc;
 procedure fpc_libinitializeunits;compilerproc;
@@ -133,6 +151,8 @@ procedure fpc_initializeunits;compilerproc;
 procedure fpc_finalizeunits;compilerproc;
 procedure fpc_do_exit;compilerproc;
 procedure fpc_div_by_zero;compilerproc;
+function fpc_qword_to_double(q:qword):double;compilerproc;
+function fpc_int64_to_double(i:int64):double;compilerproc;
 function sys_getmem(size:natuint):Pointer;compilerproc;
 procedure sys_freemem(var p:pointer);compilerproc;
 function sys_allocmem(size:natuint):Pointer;compilerproc;
@@ -159,6 +179,10 @@ procedure strcat(var dest:PChar;src:PChar);
 procedure Wstrcat(var dest:PWideChar;src:PWideChar);
 procedure strfree(var str:PChar);
 procedure Wstrfree(var str:PWideChar);
+procedure strUpperCase(var str:PChar);
+procedure strLowerCase(var str:PChar);
+procedure WstrUpperCase(var str:PWideChar);
+procedure WstrLowerCase(var str:PWideChar);
 function strcopy(str:PChar;index,count:Natuint):Pchar;
 function Wstrcopy(str:PWideChar;index,count:Natuint):PWideChar;
 function strcutout(str:PChar;left,right:Natuint):PChar;
@@ -189,8 +213,13 @@ function IntToPChar(Int:natint):Pchar;
 function IntToPWChar(Int:natint):PWideChar;
 function PCharToInt(str:PChar):natint;
 function PWCharToInt(str:PWideChar):natint;
+function ExtendedToPChar(num:Extended;Reserveddecimal:byte):PChar;
+function ExtendedToPWChar(num:Extended;Reserveddecimal:byte):PWideChar;
+function PCharToExtended(str:PChar):extended;
+function PWCharToExtended(str:PWideChar):extended;
 function DataToHex(Data:Pointer;Size:Natuint):PWideChar;
 function UIntPower(a,b:natuint):natuint;
+function ExtendedPower(a:extended;b:natuint):extended;
 function UintToHex(inputint:natuint):Pchar;
 function UintToWhex(inputint:natuint):PWideChar;
 function HexToUint(inputhex:PChar):natuint;
@@ -232,6 +261,14 @@ begin
 end;
 procedure fpc_div_by_zero;compilerproc;[public,alias:'FPC_DIVBYZERO'];
 begin
+end;
+function fpc_qword_to_double(q:qword):double;compilerproc;[public,alias:'FPC_QWORD_TO_DOUBLE'];
+begin
+ fpc_qword_to_double:=dword(q and $ffffffff)+dword(q shr 32)*double(4294967296.0);
+end;
+function fpc_int64_to_double(i:int64):double;compilerproc;[public,alias:'FPC_INT64_TO_DOUBLE'];
+begin
+ fpc_int64_to_double:=dword(i and $ffffffff)+longint(i shr 32)*double(4294967296.0);
 end;
 procedure compheap_delete_item(p:pointer);
 var i,j,k,len:natuint;
@@ -278,7 +315,11 @@ begin
 end;
 procedure sys_freemem(var p:pointer);compilerproc;[public,alias:'FPC_FREEMEM'];
 begin
- compheap_delete_item(p); p:=nil;
+ if(p<>nil) then 
+  begin
+   compheap_delete_item(p); p:=nil;
+  end
+ else p:=nil;
 end;
 function sys_allocmem(size:natuint):Pointer;compilerproc;[public,alias:'FPC_ALLOCMEM'];
 var i,istart,cstart:natuint;
@@ -391,7 +432,11 @@ begin
 end;
 procedure freemem(var p:pointer);[public,alias:'freemem'];
 begin
- sysheap_delete_item(p); p:=nil;
+ if(p<>nil) then 
+  begin
+   sysheap_delete_item(p); p:=nil;
+  end
+ else p:=nil;
 end;
 function allocmem(size:natuint):Pointer;[public,alias:'allocmem'];
 var i,istart,cstart:natuint;
@@ -467,6 +512,30 @@ end;
 procedure sysheap_clear_all;[public,alias:'sysheap_clear_all'];
 begin
  sysheap.heapcount:=0; sysheap.heaprest:=maxheap;
+end;
+function frac(x:extended):extended;[public,alias:'frac'];
+var j:natuint;
+    num,procnum:extended;
+begin
+ if(x>0) then num:=x else num:=-x;
+ procnum:=1;
+ while(procnum<=num/10) do
+  begin
+   procnum:=procnum*10;
+  end;
+ while(num>=1) do
+  begin
+   j:=0;
+   while(j<=9) do
+    begin
+     if(num>=j*procnum) and (num<(j+1)*procnum) then break;
+     j:=j+1;
+    end;
+   if(j>=10) then break;
+   num:=num-j*procnum;
+   if(procnum>1) then procnum:=procnum/10;
+  end;
+ frac:=num;
 end;
 function strlen(str:Pchar):natuint;[public,alias:'strlen'];
 var res:natuint;
@@ -570,6 +639,42 @@ procedure Wstrfree(var str:PWideChar);[public,alias:'Wstrfree'];
 begin
  freemem(str); if(str<>nil) then str:=nil;
 end;
+procedure strUpperCase(var str:PChar);[public,alias:'strUpperCase'];
+var i,len:natuint;
+begin
+ len:=strlen(str);
+ for i:=1 to len do
+  begin
+   if(str^>='a') and (str^<='z') then str^:=Char(Byte(str^)-32);
+  end;
+end;
+procedure strLowerCase(var str:PChar);[public,alias:'strLowerCase'];
+var i,len:natuint;
+begin
+ len:=strlen(str);
+ for i:=1 to len do
+  begin
+   if(str^>='A') and (str^<='Z') then str^:=Char(Byte(str^)+32);
+  end;
+end;
+procedure WstrUpperCase(var str:PWideChar);[public,alias:'WstrUpperCase'];
+var i,len:natuint;
+begin
+ len:=Wstrlen(str);
+ for i:=1 to len do
+  begin
+   if(str^>='a') and (str^<='z') then str^:=WideChar(Word(str^)-32);
+  end;
+end;
+procedure WstrLowerCase(var str:PWideChar);[public,alias:'WstrLowerCase'];
+var i,len:natuint;
+begin
+ len:=Wstrlen(str);
+ for i:=1 to len do
+  begin
+   if(str^>='A') and (str^<='Z') then str^:=WideChar(Word(str^)+32);
+  end;
+end;  
 function strcopy(str:PChar;index,count:Natuint):Pchar;[public,alias:'strcopy'];
 var newstr:PChar;
     i:natuint;
@@ -1108,7 +1213,7 @@ var i,j:natuint;
     res,start:natint;
     negative:boolean;
 begin
- res:=0;
+ res:=0; start:=1;
  if(str=nil) then exit(0);
  if(str^='-') then 
   begin
@@ -1132,7 +1237,7 @@ var i,j:natuint;
     res,start:natint;
     negative:boolean;
 begin
- res:=0;
+ res:=0; start:=1;
  if(str=nil) then exit(0);
  if(str^='-') then 
   begin
@@ -1150,6 +1255,286 @@ begin
   end;
  if(negative=true) then PWCharToInt:=-res else PWCharToInt:=res;
 end;
+function ExtendedToPChar(num:Extended;Reserveddecimal:byte):PChar;[public,alias:'ExtendedToPChar'];
+const numchar:PChar='0123456789';
+var orgnum,intpart,decpart,procnum:extended;
+    partstr1,partstr2,res:PChar;
+    isnegative,havedecimal:boolean;
+    len1,len2,i,size:natuint;
+begin
+ if(num>0) then
+  begin
+   orgnum:=num; isnegative:=false;
+  end
+ else
+  begin
+   orgnum:=-num; isnegative:=true;
+  end;
+ intpart:=orgnum-frac(orgnum); decpart:=frac(orgnum)*ExtendedPower(10,Reserveddecimal);
+ partstr1:=nil; partstr2:=nil;
+ len1:=0; len2:=0;
+ if(decpart=0) then havedecimal:=false else havedecimal:=true;
+ procnum:=1;
+ while(procnum<=intpart) do
+  begin
+   procnum:=procnum*10;
+  end;
+ while(intpart>0) do
+  begin
+   inc(len1);
+   if(procnum>1) then procnum:=procnum/10;
+   i:=0;
+   while(i<=9) do
+    begin
+     if(intpart>=procnum*i) and (intpart<procnum*(i+1)) then break;
+     inc(i);
+    end;
+   intpart:=intpart-procnum*i;
+   strrealloc(partstr1,len1);
+   (partstr1+len1-1)^:=(numchar+i)^;
+   if(i>=10) or (procnum<=1) then break;
+  end;
+ procnum:=1;
+ while(procnum<=decpart) do
+  begin
+   procnum:=procnum*10;
+  end;
+ while(decpart>0) do
+  begin
+   inc(len2);
+   if(procnum>1) then procnum:=procnum/10;
+   i:=0;
+   while(i<=9) do
+    begin
+     if(decpart>=procnum*i) and (decpart<procnum*(i+1)) then break;
+     inc(i);
+    end;
+   decpart:=decpart-procnum*i;
+   strrealloc(partstr2,len2);
+   (partstr2+len2-1)^:=(numchar+i)^;
+   if(i>=10) or (procnum<=1) then break;
+  end;
+ if(len2>0) then size:=len1+len2+2 else size:=len1+1;
+ if(isnegative) then
+  begin
+   if(havedecimal) then
+    begin
+     strinit(res,1+len1+1+reserveddecimal);
+     strset(res,'-');
+     strcat(res,partstr1);
+     strcat(res,'.');
+     for i:=1 to reserveddecimal-len2 do strcat(res,'0');
+     strcat(res,partstr2);
+    end
+   else
+    begin
+     strinit(res,1+len1);
+     strset(res,'-');
+     strcat(res,partstr1);
+    end;
+  end
+ else
+  begin
+   if(havedecimal) then
+    begin
+     strinit(res,len1+1+reserveddecimal);
+     strset(res,partstr1);
+     strcat(res,'.');
+     for i:=1 to reserveddecimal-len2 do strcat(res,'0');
+     strcat(res,partstr2);
+    end
+   else
+    begin
+     strinit(res,len1);
+     strset(res,partstr1);
+    end;
+  end;
+ if(havedecimal) then strfree(partstr2);
+ strfree(partstr1);
+ res:=res-size;
+ ExtendedToPChar:=res;
+end; 
+function ExtendedToPWChar(num:Extended;Reserveddecimal:byte):PWideChar;[public,alias:'ExtendedToPWChar'];
+const numchar:PWideChar='0123456789';
+var orgnum,intpart,decpart,procnum:extended;
+    partstr1,partstr2,res:PWideChar;
+    isnegative,havedecimal:boolean;
+    len1,len2,i,size:natuint;
+begin
+ if(num>0) then
+  begin
+   orgnum:=num; isnegative:=false;
+  end
+ else
+  begin
+   orgnum:=-num; isnegative:=true;
+  end;
+ intpart:=orgnum-frac(orgnum); decpart:=frac(orgnum)*ExtendedPower(10,Reserveddecimal);
+ partstr1:=nil; partstr2:=nil;
+ len1:=0; len2:=0;
+ if(decpart=0) then havedecimal:=false else havedecimal:=true;
+ procnum:=1;
+ while(procnum<=intpart) do
+  begin
+   procnum:=procnum*10;
+  end;
+ while(intpart>0) do
+  begin
+   inc(len1);
+   if(procnum>1) then procnum:=procnum/10;
+   i:=0;
+   while(i<=9) do
+    begin
+     if(intpart>=procnum*i) and (intpart<procnum*(i+1)) then break;
+     inc(i);
+    end;
+   intpart:=intpart-procnum*i;
+   Wstrrealloc(partstr1,len1);
+   (partstr1+len1-1)^:=(numchar+i)^;
+   if(i>=10) or (procnum<=1) then break;
+  end;
+ procnum:=1;
+ while(procnum<=decpart) do
+  begin
+   procnum:=procnum*10;
+  end;
+ while(decpart>0) do
+  begin
+   inc(len2);
+   if(procnum>1) then procnum:=procnum/10;
+   i:=0;
+   while(i<=9) do
+    begin
+     if(decpart>=procnum*i) and (decpart<procnum*(i+1)) then break;
+     inc(i);
+    end;
+   decpart:=decpart-procnum*i;
+   Wstrrealloc(partstr2,len2);
+   (partstr2+len2-1)^:=(numchar+i)^;
+   if(i>=10) or (procnum<=1) then break;
+  end;
+ if(len2>0) then size:=len1+len2+2 else size:=len1+1;
+ if(isnegative) then
+  begin
+   if(havedecimal) then
+    begin
+     Wstrinit(res,1+len1+1+reserveddecimal);
+     Wstrset(res,'-');
+     Wstrcat(res,partstr1);
+     Wstrcat(res,'.');
+     for i:=1 to reserveddecimal-len2 do Wstrcat(res,'0');
+     Wstrcat(res,partstr2);
+    end
+   else
+    begin
+     Wstrinit(res,1+len1);
+     Wstrset(res,'-');
+     Wstrcat(res,partstr1);
+    end;
+  end
+ else
+  begin
+   if(havedecimal) then
+    begin
+     Wstrinit(res,len1+1+reserveddecimal);
+     Wstrset(res,partstr1);
+     Wstrcat(res,'.');
+     for i:=1 to reserveddecimal-len2 do Wstrcat(res,'0');
+     Wstrcat(res,partstr2);
+    end
+   else
+    begin
+     Wstrinit(res,len1);
+     Wstrset(res,partstr1);
+    end;
+  end;
+ if(havedecimal) then Wstrfree(partstr2);
+ Wstrfree(partstr1);
+ res:=res-size;
+ ExtendedToPWChar:=res;
+end;  
+function PCharToExtended(str:PChar):extended;[public,alias:'PCharToExtended'];
+const numchar:PChar='0123456789';
+var intpart,decpart:extended;
+    position,startx,i,j,len:natuint;
+begin
+ position:=strpos(str,'.',1);
+ if(str^='-') then startx:=2 else startx:=1;
+ len:=Strlen(str); intpart:=0; decpart:=0;
+ if(position>0) then
+  begin
+   for i:=startx to position-1 do
+    begin
+     j:=0;
+     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
+     intpart:=intpart*10+j;
+    end;
+   for i:=position+1 to len do
+    begin
+     j:=0;
+     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
+     decpart:=decpart*10+j;
+    end;
+  end
+ else
+  begin
+   for i:=startx to len do
+    begin
+     j:=0;
+     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
+     intpart:=intpart*10+j;
+    end;
+  end;
+ if(startx=2) then
+  begin
+   PCharToExtended:=intpart+decpart/ExtendedPower(10,len-position);
+  end
+ else if(startx=1) then
+  begin
+   PCharToExtended:=intpart+decpart/ExtendedPower(10,len-position);
+  end;
+end; 
+function PWCharToExtended(str:PWideChar):extended;[public,alias:'PWCharToExtended'];
+const numchar:PWideChar='0123456789';
+var intpart,decpart:extended;
+    position,startx,i,j,len:natuint;
+begin
+ position:=Wstrpos(str,'.',1);
+ if(str^='-') then startx:=2 else startx:=1;
+ len:=WStrlen(str); intpart:=0; decpart:=0;
+ if(position>0) then
+  begin
+   for i:=startx to position-1 do
+    begin
+     j:=0;
+     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
+     intpart:=intpart*10+j;
+    end;
+   for i:=position+1 to len do
+    begin
+     j:=0;
+     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
+     decpart:=decpart*10+j;
+    end;
+  end
+ else
+  begin
+   for i:=startx to len do
+    begin
+     j:=0;
+     while(j<=9) do if((str+i-1)^=(numchar+j)^) then break;
+     intpart:=intpart*10+j;
+    end;
+  end;
+ if(startx=2) then
+  begin
+   PWCharToExtended:=intpart+decpart/ExtendedPower(10,len-position);
+  end
+ else if(startx=1) then
+  begin
+   PWCharToExtended:=intpart+decpart/ExtendedPower(10,len-position);
+  end;
+end; 
 function DataToHex(Data:Pointer;Size:Natuint):PWideChar;[public,alias:'DataToHex'];
 const hexcode:PWideChar='0123456789ABCDEF';
 var highbit,lowbit:byte;
@@ -1175,6 +1560,17 @@ begin
    res:=res*a;
   end;
  UintPower:=res;
+end;
+function ExtendedPower(a:extended;b:natuint):extended;[public,alias:'ExtendedPower'];
+var res:extended;
+    i:natuint;
+begin
+ res:=1;
+ for i:=1 to b do
+  begin
+   res:=res*a;
+  end;
+ ExtendedPower:=res;
 end;
 function UintToHex(inputint:natuint):Pchar;[public,alias:'UintToHex'];
 const hexcode:PChar='0123456789ABCDEF';

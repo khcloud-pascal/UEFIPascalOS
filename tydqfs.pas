@@ -2,7 +2,7 @@ unit tydqfs;
 
 interface
 
-{$POINTERMATH ON}
+{$MODE FPC}
 
 uses uefi;
 
@@ -62,6 +62,19 @@ type tydqfs_time=packed record
                         header:tydqfs_system_header;
                         userinfolist:^tydqfs_user_info;
                         end;
+     tydqfs_file_sections=packed record
+                          exename:array[1..16] of WideChar;
+                          exesectionbaseaddress,exesectionsize:qword;
+                          end;
+     tydqfs_file_executable=packed record
+                            exesignature:qword;
+                            exetype:byte;
+                            exearch:byte;
+                            exeloadaddress:qword;
+                            exesectionnumber:qword;
+                            exesection:^tydqfs_file_sections;
+                            end;
+     tydqfs_main_entry=function:efi_status;
 
 const tydqfs_signature:qword=$5D47291AD7E3F2B1;
       tydqfs_folder:byte=$01;
@@ -75,6 +88,17 @@ const tydqfs_signature:qword=$5D47291AD7E3F2B1;
       userlevel_system:byte=$00;
       userlevel_user:byte=$01;
       userlevel_application:byte=$02;
+      tydqfs_executable_signature:qword=$DD23F9E3F3C1ABEF;
+      tydqfs_executable_exec:byte=$00;
+      tydqfs_executable_relocatable:byte=$01;
+      tydqfs_executable_target:byte=$02;
+      tydqfs_executable_staticlib:byte=$03;
+      tydqfs_executable_dynamiclib:byte=$04;
+      tydqfs_x64:byte=$00;
+      tydqfs_aa64:byte=$01;
+      tydqfs_loongarch64:byte=$02;
+      tydqfs_riscv64:byte=$03;
+      tydqfs_riscv128:byte=$04;
       
 function tydq_fs_byte_to_attribute_bool(attr:byte):tydqfs_attribute_bool;      
 function tydq_combine_path_and_filename(path:PWideChar;filename:PWideChar):PWideChar;
@@ -111,7 +135,11 @@ function tydq_fs_systeminfo_get_index(sysinfo:tydqfs_system_info;username:PWideC
 function tydq_fs_systeminfo_get_manager_index(sysinfo:tydqfs_system_info):natuint;
 function tydq_fs_systeminfo_username_count(sysinfo:tydqfs_system_info;username:PWideChar):natuint;
 procedure tydq_fs_systeminfo_free(var sysinfo:tydqfs_system_info);
+function tydq_fs_read_executable(edl:efi_disk_list;diskindex:natuint;filename:PWideChar):tydqfs_file_executable;
+procedure tydq_fs_execute_executable(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar);
+procedure tydq_fs_free_executable(var fse:tydqfs_file_executable);
 function tydq_fs_legal_filename(filename:PWideChar):boolean;
+function tydq_fs_legal_length_filename(filename:PWideChar):boolean;
 
 var tydqcurrentdiskname:PWideChar;
     tydqcurrentpath:PWideChar;
@@ -1461,10 +1489,11 @@ begin
  inc(sysinfo.header.tydqusercount);
  size:=getmemsize(sysinfo.userinfolist);
  ReallocMem(sysinfo.userinfolist,sizeof(tydqfs_user_info)*sysinfo.header.tydqusercount);
- for i:=1 to sysinfo.header.tydqusercount-1 do
+ i:=sysinfo.header.tydqusercount-1;
+ if(i>0) then
   begin
-   (sysinfo.userinfolist+i-1)^.username:=PWideChar(Pointer(sysinfo.userinfolist^.username)-size);
-   (sysinfo.userinfolist+i-1)^.userpasswd:=PWideChar(Pointer(sysinfo.userinfolist^.userpasswd)-size);
+   (sysinfo.userinfolist+i-1)^.username:=PWideChar(Pointer((sysinfo.userinfolist+i-1)^.username)-size);
+   (sysinfo.userinfolist+i-1)^.userpasswd:=PWideChar(Pointer((sysinfo.userinfolist+i-1)^.userpasswd)-size);
   end;
  Wstrinit((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.username,Wstrlen(newusername));
  Wstrset((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.username,newusername);
@@ -1473,7 +1502,7 @@ begin
  (sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.usermanager:=Manager;
 end;
 procedure tydq_fs_systeminfo_delete_user(var sysinfo:tydqfs_system_info;username:PWideChar);[public,alias:'TYDQ_FS_SYSTEMINFO_DELETE_USER'];
-var i,j,size,size2,size3:natuint;
+var i,j,size1,size2:natuint;
 begin
  i:=1;
  while(i<=sysinfo.header.tydqusercount) do
@@ -1481,18 +1510,28 @@ begin
    if(Wstrcmp((sysinfo.userinfolist+i-1)^.username,username)=0) and (Wstrlen((sysinfo.userinfolist+i-1)^.username)=Wstrlen(username)) then break;
    inc(i);
   end;
- if(i>sysinfo.header.tydqusercount) then exit;
- size:=getmemsize(sysinfo.userinfolist);
- dec(sysinfo.header.tydqusercount);
- if(sysinfo.header.tydqusercount>0) then ReallocMem(sysinfo.userinfolist,sizeof(tydqfs_user_info)*sysinfo.header.tydqusercount);
- size2:=getmemsize((sysinfo.userinfolist+i-1)^.username); size3:=getmemsize((sysinfo.userinfolist+i-1)^.userpasswd);
- Wstrfree((sysinfo.userinfolist+i-1)^.userpasswd); Wstrfree((sysinfo.userinfolist+i-1)^.username);
- for j:=i+1 to sysinfo.header.tydqusercount+1 do
+ if(i>sysinfo.header.tydqusercount) then exit else 
   begin
-   (sysinfo.userinfolist+j-1)^.username:=PWideChar(Pointer((sysinfo.userinfolist+j-1)^.username)-(size+size2+size3));
-   (sysinfo.userinfolist+j-1)^.userpasswd:=PWideChar(Pointer((sysinfo.userinfolist+j-1)^.userpasswd)-(size+size2+size3));
+   size1:=getmemsize(sysinfo.userinfolist);
+   size2:=getmemsize((sysinfo.userinfolist+i-1)^.username)+getmemsize((sysinfo.userinfolist+i-1)^.userpasswd);
+   Wstrfree((sysinfo.userinfolist+i-1)^.userpasswd); Wstrfree((sysinfo.userinfolist+i-1)^.username);
+   ReallocMem(sysinfo.userinfolist,sizeof(tydqfs_user_info)*(sysinfo.header.tydqusercount-1));
+   if(sysinfo.header.tydqusercount>1) then
+    begin
+     sysinfo.userinfolist:=Pointer(Pointer(sysinfo.userinfolist)-size2);
+     for j:=i to sysinfo.header.tydqusercount-1 do
+      begin
+       (sysinfo.userinfolist+j-1)^.userpasswd:=Pointer(Pointer((sysinfo.userinfolist+j)^.userpasswd)-size1-size2);
+       (sysinfo.userinfolist+j-1)^.username:=Pointer(Pointer((sysinfo.userinfolist+j)^.username)-size1-size2);
+      end;
+     ReallocMem(sysinfo.userinfolist,sizeof(tydqfs_user_info)*(sysinfo.header.tydqusercount-1));
+    end
+   else 
+    begin
+     freemem(sysinfo.userinfolist); sysinfo.userinfolist:=nil;
+    end;
   end;
- if(sysinfo.header.tydqusercount=0) then sysinfo.userinfolist:=nil;
+ if(sysinfo.header.tydqusercount>0) then dec(sysinfo.header.tydqusercount);
 end;
 function tydq_fs_systeminfo_get_passwd(sysinfo:tydqfs_system_info;username:PWideChar):PWideChar;[public,alias:'TYDQ_FS_SYSTEMINFO_GET_PASSWD'];
 var i:natuint;
@@ -1548,19 +1587,89 @@ end;
 procedure tydq_fs_systeminfo_free(var sysinfo:tydqfs_system_info);[public,alias:'TYDQ_FS_SYSTEMINFO_FREE'];
 var i,size:natuint;
 begin 
- Wstrfree((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.userpasswd); 
- Wstrfree((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.username); size:=0;
- for i:=sysinfo.header.tydqusercount-1 downto 1 do
+ if(sysinfo.header.tydqusercount>0) then 
   begin
-   size:=size+getmemsize((sysinfo.userinfolist+i-1)^.userpasswd)+getmemsize((sysinfo.userinfolist+i-1)^.username);
-   Wstrfree((sysinfo.userinfolist+i-1)^.userpasswd); Wstrfree((sysinfo.userinfolist+i-1)^.username);
+   Wstrfree((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.userpasswd);   
+   Wstrfree((sysinfo.userinfolist+sysinfo.header.tydqusercount-1)^.username); 
   end;
- sysinfo.userinfolist:=Pointer(Pointer(sysinfo.userinfolist)-size);
+ size:=0;
+ if(sysinfo.header.tydqusercount>1) then
+  begin
+   for i:=sysinfo.header.tydqusercount-1 downto 1 do
+    begin
+     size:=size+getmemsize((sysinfo.userinfolist+i-1)^.userpasswd)+getmemsize((sysinfo.userinfolist+i-1)^.username);
+     Wstrfree((sysinfo.userinfolist+i-1)^.userpasswd); Wstrfree((sysinfo.userinfolist+i-1)^.username);
+    end;
+  end;
+ if(sysinfo.userinfolist<>nil) then sysinfo.userinfolist:=Pointer(Pointer(sysinfo.userinfolist)-size);
  freemem(sysinfo.userinfolist);
  sysinfo.header.tydqusercount:=0; sysinfo.header.tydqsyslang:=0; sysinfo.header.tydqnetwork:=false; sysinfo.header.tydqgraphics:=false;
 end;
+function tydq_fs_read_executable(edl:efi_disk_list;diskindex:natuint;filename:PWideChar):tydqfs_file_executable;[public,alias:'TYDQ_FS_READ_EXECUTABLE'];
+var position,i:natuint;
+    dp:Pefi_disk_io_protocol;
+    bp:Pefi_block_io_protocol;
+    res:tydqfs_file_executable;
+begin
+ position:=tydq_fs_file_position(edl,diskindex,filename);
+ dp:=(edl.disk_content+diskindex-1)^; bp:=(edl.disk_block_content+diskindex-1)^;
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position,26,res); res.exesection:=nil;
+ if(res.exesignature<>$DD23F9E3F3C1ABEF) then exit;
+ res.exesection:=allocmem(sizeof(tydqfs_file_sections)*res.exesectionnumber);
+ for i:=1 to res.exesectionnumber do
+  begin
+   dp^.ReadDisk(dp,bp^.Media^.MediaId,position+26+sizeof(tydqfs_file_sections)*(i-1),sizeof(tydqfs_file_sections),(res.exesection+i-1)^);
+  end;
+ tydq_fs_read_executable:=res;
+end;
+procedure tydq_fs_execute_executable(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar);[public,alias:'TYDQ_FS_EXECUTE_EXECUTABLE'];
+var procrecord:tydqfs_file_executable;
+    position,mainentry,rescode,i,j:natuint;
+    mainfunc:tydqfs_main_entry;
+    SegmentAddress:^Pointer;
+    dp:Pefi_disk_io_protocol;
+    bp:Pefi_block_io_protocol;
+begin
+ procrecord:=tydq_fs_read_executable(edl,diskindex,filename); 
+ dp:=(edl.disk_content+diskindex-1)^; bp:=(edl.disk_block_content+diskindex-1)^;
+ if(procrecord.exetype<>tydqfs_executable_exec) then exit;
+ SegmentAddress:=allocmem(sizeof(natuint)*procrecord.exesectionnumber); mainentry:=0;
+ position:=tydq_fs_file_position(edl,diskindex,filename);
+ for i:=1 to procrecord.exesectionnumber do
+  begin
+   if(Wstrcmp('main',@(procrecord.exesection+i-1)^.exename)=0) then 
+    begin
+     mainentry:=i;
+     SystemTable^.BootServices^.AllocatePool(EfiLoaderCode,(procrecord.exesection+i-1)^.exesectionsize,(SegmentAddress+i-1)^);
+     for j:=1 to (procrecord.exesection+i-1)^.exesectionsize do
+      begin
+       dp^.ReadDisk(dp,bp^.Media^.MediaId,position+(procrecord.exesection+i-1)^.exesectionbaseaddress+j-1,1,((SegmentAddress+i-1)^+j-1)^);
+      end;
+    end
+   else
+    begin
+     SystemTable^.BootServices^.AllocatePool(EfiLoaderData,(procrecord.exesection+i-1)^.exesectionsize,(SegmentAddress+i-1)^);
+     for j:=1 to (procrecord.exesection+i-1)^.exesectionsize do
+      begin
+       dp^.ReadDisk(dp,bp^.Media^.MediaId,position+(procrecord.exesection+i-1)^.exesectionbaseaddress+j-1,1,((SegmentAddress+i-1)^+j-1)^);
+      end;
+    end;  
+  end;
+ mainfunc:=tydqfs_main_entry((SegmentAddress+mainentry-1)^);
+ rescode:=mainfunc();
+ for i:=1 to procrecord.exesectionnumber do
+  begin
+   SystemTable^.BootServices^.FreePool((SegmentAddress+i-1)^);
+  end;
+ Freemem(SegmentAddress);
+end;
+procedure tydq_fs_free_executable(var fse:tydqfs_file_executable);[public,alias:'TYDQ_FS_FREE_EXECUTABLE'];
+begin
+ freemem(fse.exesection);
+ fse.exesignature:=0; fse.exetype:=0; fse.exearch:=0; fse.exeloadaddress:=0; fse.exesectionnumber:=0;
+end;
 function tydq_fs_legal_filename(filename:PWideChar):boolean;[public,alias:'TYDQ_FS_LEGAL_FILENAME'];
-const illegalchar:PWideChar=' ?*';
+const illegalchar:PWideChar='?*${}[]()@#^%';
 var i,j,len,len2:natuint;
 begin
  len:=Wstrlen(filename); len2:=Wstrlen(illegalchar);
@@ -1572,6 +1681,18 @@ begin
     end;
   end;
  tydq_fs_legal_filename:=true;
+end;
+function tydq_fs_legal_length_filename(filename:PWideChar):boolean;[public,alias:'TYDQ_FS_LEGAL_LENGTH_FILENAME'];
+var i1,i2:natuint;
+begin
+ i1:=1; i2:=2;
+ while(i2>0) do
+  begin
+   i2:=Wstrpos(filename,'/',i1+1);
+   if(i2-1-i1<=255) or (i2-1-i1>0) then exit(false);
+   i1:=i2;
+  end;
+ tydq_fs_legal_length_filename:=true;
 end;
 
 end.

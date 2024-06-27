@@ -1,5 +1,7 @@
 library uefiinstaller;
 
+{$MODE FPC}
+
 uses uefi,tydqfs;
 
 function efi_main(ImageHandle:efi_handle;systemtable:Pefi_system_table):efi_status;cdecl;[public,alias:'_DLLMainCRTStartup'];
@@ -45,7 +47,8 @@ begin
     efi_console_output_string(systemtable,'Cdrom');
     efi_console_output_string(systemtable,UintToPWChar(i));
     efi_console_output_string(systemtable,' Size:');
-    efi_console_output_string(systemtable,UintToPWChar(efsi.VolumeSize));
+    efi_console_output_string(systemtable,ExtendedToPWChar(efsi.VolumeSize/(1024*1024),2));
+    efi_console_output_string(systemtable,'MiB');
     efi_console_output_string(systemtable,#13#10);
     efp^.Close(efp);
    end;
@@ -60,7 +63,8 @@ begin
     efi_console_output_string(systemtable,UintToPWChar(i));
     efi_console_output_string(systemtable,'-');
     realsize:=((edl.disk_block_content+i-1)^)^.Media^.BlockSize*(((edl.disk_block_content+i-1)^)^.Media^.LastBlock+1);
-    efi_console_output_string(systemtable,UintToPWChar(realsize));
+    efi_console_output_string(systemtable,ExtendedToPWChar(realsize/(1024*1024*1024),2));
+    efi_console_output_string(systemtable,'GiB');
     efi_console_output_string(systemtable,#13#10);
    end;
   efi_console_output_string(systemtable,'Do you want to install the cdrom to the hard disk(Y or y is yes,other is no)?'#13#10);
@@ -91,25 +95,25 @@ begin
   if(efsl.file_system_count>1) then
    begin
     cdindex:=efsl.file_system_count+1;
-    while (cdindex<efsl.file_system_count+1) do
+    while (cdindex=0) or (cdindex<efsl.file_system_count+1) do
      begin
       efi_console_output_string(systemtable,'Select the cdrom to install:');
       efi_console_read_string(systemtable,mystr);
       cdindex:=PWCharToUint(mystr);
       Wstrfree(mystr);
-      if(cdindex>=efsl.file_system_count+1) then efi_console_output_string(systemtable,'Error:Invaild Cdrom.'+#13#10);
+      if(cdindex>=efsl.file_system_count+1) or (cdindex=0) then efi_console_output_string(systemtable,'Error:Invaild Cdrom.'+#13#10);
      end;
    end;
   if(edl.disk_count>1) then
    begin
     hdindex:=edl.disk_count+1;
-    while (cdindex<edl.disk_count+1) do
+    while (hdindex=0) or (hdindex<edl.disk_count+1) do
      begin
       efi_console_output_string(systemtable,'Select the hard disk to be installed:');
       efi_console_read_string(systemtable,mystr);
       hdindex:=PWCharToUint(mystr);
       Wstrfree(mystr);
-      if(hdindex>=edl.disk_count+1) then efi_console_output_string(systemtable,'Error:Invaild Hard Disk.'+#13#10);
+      if(hdindex>=edl.disk_count+1) or (hdindex=0) then efi_console_output_string(systemtable,'Error:Invaild Hard Disk.'+#13#10);
      end;
    end;
   efi_install_cdrom_to_hard_disk(systemtable,efsl,edl,cdindex,hdindex);
@@ -128,7 +132,8 @@ begin
      efi_console_output_string(systemtable,'Cdrom ');
      efi_console_output_string(systemtable,UintToPWChar(i));
      efi_console_output_string(systemtable,' - ');
-     efi_console_output_string(systemtable,UintToPWChar(efsi.VolumeSize));
+     efi_console_output_string(systemtable,ExtendedToPWChar(efsi.VolumeSize/(1024*1024),2));
+     efi_console_output_string(systemtable,'MiB');
      efi_console_output_string(systemtable,#13#10);
     end;
    if(efslext.fsrwcount>0) then efi_console_output_string(systemtable,'Your EFI System Partition is:'+#13#10);
@@ -140,7 +145,8 @@ begin
      efi_console_output_string(systemtable,'EFI System Partition ');
      efi_console_output_string(systemtable,UintToPWChar(i));
      efi_console_output_string(systemtable,' - ');
-     efi_console_output_string(systemtable,UintToPWChar(efsi.VolumeSize));
+     efi_console_output_string(systemtable,ExtendedToPWChar(efsi.VolumeSize/(1024*1024),2));
+     efi_console_output_string(systemtable,'MiB');
      efi_console_output_string(systemtable,#13#10);
     end;
    cdindex:=1; hdindex:=1;
@@ -177,7 +183,8 @@ begin
        efi_console_output_string(systemtable,UintToPWChar(i));
        efi_console_output_string(systemtable,' - ');
        realsize:=((edl2.disk_block_content+i-1)^)^.Media^.BlockSize*(((edl2.disk_block_content+i-1)^)^.Media^.LastBlock+1);
-       efi_console_output_string(systemtable,UintToPWChar(realsize));
+       efi_console_output_string(systemtable,ExtendedToPWChar(realsize/(1024*1024*1024),2));
+       efi_console_output_string(systemtable,'GiB');
        efi_console_output_string(systemtable,#13#10);
       end;
       efi_console_output_string(systemtable,'Do you want to format the empty disk to TYDQ File System(Y or y is yes,other is no)?'#13#10);
@@ -213,8 +220,12 @@ begin
            efi_console_output_string(systemtable,' is:');
            efi_console_read_String(systemtable,mystr);
            emptyindex:=PWcharToUint(mystr);
-           ((edl2.disk_content+emptyindex-1)^)^.ReadDisk((edl2.disk_content+emptyindex-1)^,
-           ((edl2.disk_block_content+emptyindex-1)^)^.Media^.MediaId,0,8,verifydata);
+           if(emptyindex<=edl2.disk_count) and (emptyindex>=1) then
+            begin
+             ((edl2.disk_content+emptyindex-1)^)^.ReadDisk((edl2.disk_content+emptyindex-1)^,
+             ((edl2.disk_block_content+emptyindex-1)^)^.Media^.MediaId,0,8,verifydata);
+            end
+           else verifydata:=$0000000000000000;
            if(emptyindex>edl2.disk_count) or (emptyindex=0) then
             begin
              efi_console_output_string(systemtable,'Error:Invaild Disk.'+#13#10);
@@ -243,7 +254,7 @@ begin
                efi_console_output_string(systemtable,#39's name(Name length DO NOT exceeds to 255):');
                efi_console_read_string(systemtable,mystr);
               end;
-             efi_disk_tydq_set_fs(systemtable,edl2,emptyindex);
+             efi_disk_tydq_set_fs(edl2,emptyindex);
              tydq_fs_initialize(edl2,emptyindex,mystr);
              Wstrfree(mystr); freemem(edl3.disk_block_content); freemem(edl3.disk_content); edl3.disk_count:=0;
              edl3:=efi_disk_tydq_get_fs_list(systemtable);
@@ -267,36 +278,40 @@ begin
                     begin
                      efi_console_output_string(systemtable,'Set your account name(Name length must be in 1-128):');
                      efi_console_read_string(systemtable,mystr);
-                   while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) or (tydq_fs_legal_filename(mystr)=false) do
-                    begin
-                     if(tydq_fs_legal_filename(mystr)=false) then
-                     efi_console_output_string(systemtable,'Error:Account name is illegal(space,* or ? is illegal character).'#10)
-                     else efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10);
-                     efi_console_output_string(systemtable,'Set your account name:');
-                     efi_console_read_string(systemtable,mystr);
+                     while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) or (tydq_fs_legal_filename(mystr)=false) do
+                      begin
+                       if(tydq_fs_legal_filename(mystr)=false) then
+                       efi_console_output_string(systemtable,'Error:Account name is illegal(space,* or ? is illegal character).'#10)
+                       else efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10);
+                       efi_console_output_string(systemtable,'Set your account name:');
+                       efi_console_read_string(systemtable,mystr);
+                      end;
+                     efi_console_output_string(systemtable,'Set your account password(Password length must be in 1-128):');
+                     efi_console_read_password_string(systemtable,mystr2);
+                     while(Wstrlen(mystr2)=0) or (Wstrlen(mystr2)>128) do
+                      begin
+                       efi_console_output_string(systemtable,'Error:Account password is invaild.'#10);
+                       efi_console_output_string(systemtable,'Set your account name:');
+                       efi_console_read_string(systemtable,mystr);
+                      end;
+                     efi_console_output_string(systemtable,'Verify your account password:');
+                     efi_console_read_password_string(systemtable,mystr3);
+                     while(Wstrcmp(mystr2,mystr3)<>0) or (WStrlen(mystr2)<>Wstrlen(mystr3)) do
+                      begin
+                       efi_console_output_string(systemtable,'Error:Typed password does not match your password.'#10);
+                       efi_console_output_string(systemtable,'Verify your account password:');
+                       efi_console_read_password_string(systemtable,mystr3);
+                      end;
+                     tydq_fs_systeminfo_add_user(fsi,mystr,mystr2,true);
+                     tydq_fs_systeminfo_write(systemtable,edl3,fsi);
+                     Wstrfree(mystr3); Wstrfree(mystr2);
                     end;
-                   efi_console_output_string(systemtable,'Set your account password(Password length must be in 1-128):');
-                   efi_console_read_password_string(systemtable,mystr2);
-                   while(Wstrlen(mystr2)=0) or (Wstrlen(mystr2)>128) do
-                    begin
-                     efi_console_output_string(systemtable,'Error:Account password is invaild.'#10);
-                     efi_console_output_string(systemtable,'Set your account name:');
-                     efi_console_read_string(systemtable,mystr);
-                    end;
-                  efi_console_output_string(systemtable,'Verify your account password:');
-                  efi_console_read_password_string(systemtable,mystr3);
-                  while(Wstrcmp(mystr2,mystr3)<>0) or (WStrlen(mystr2)<>Wstrlen(mystr3)) do
-                   begin
-                    efi_console_output_string(systemtable,'Error:Typed password does not match your password.'#10);
-                    efi_console_output_string(systemtable,'Verify your account password:');
-                    efi_console_read_password_string(systemtable,mystr3);
-                   end;
-                   tydq_fs_systeminfo_add_user(fsi,mystr,mystr2,true);
-                   tydq_fs_systeminfo_write(systemtable,edl3,fsi);
-                   Wstrfree(mystr3); Wstrfree(mystr2);
+                   Wstrfree(mystr);
+                  end
+                 else
+                  begin
+                   efi_console_output_string(systemtable,'You will create the account later when entering the system.'#10);
                   end;
-                  Wstrfree(mystr);
-                 end;
                 end
                else
                 begin
@@ -334,7 +349,8 @@ begin
      efi_console_output_string(systemtable,'Cdrom ');
      efi_console_output_string(systemtable,UintToPWChar(i));
      efi_console_output_string(systemtable,' - ');
-     efi_console_output_string(systemtable,UintToPWChar(efsi.VolumeSize));
+     efi_console_output_string(systemtable,ExtendedToPWChar(efsi.VolumeSize/(1024*1024),2));
+     efi_console_output_string(systemtable,'MiB');
      efi_console_output_string(systemtable,#13#10);
     end;
    if(efslext.fsrwcount>0) then efi_console_output_string(systemtable,'Your EFI System Partition is:'+#13#10);
@@ -346,7 +362,8 @@ begin
      efi_console_output_string(systemtable,'EFI System Partition ');
      efi_console_output_string(systemtable,UintToPWChar(i));
      efi_console_output_string(systemtable,' - ');
-     efi_console_output_string(systemtable,UintToPWChar(efsi.VolumeSize));
+     efi_console_output_string(systemtable,ExtendedToPWChar(efsi.VolumeSize/(1024*1024),2));
+     efi_console_output_string(systemtable,'MiB');
      efi_console_output_string(systemtable,#13#10);
     end;
    cdindex:=1; hdindex:=1;
@@ -383,7 +400,8 @@ begin
        efi_console_output_string(systemtable,UintToPWChar(i));
        efi_console_output_string(systemtable,' - ');
        realsize:=((edl2.disk_block_content+i-1)^)^.Media^.BlockSize*(((edl2.disk_block_content+i-1)^)^.Media^.LastBlock+1);
-       efi_console_output_string(systemtable,UintToPWChar(realsize));
+       efi_console_output_string(systemtable,ExtendedToPWChar(realsize/(1024*1024*1024),2));
+       efi_console_output_string(systemtable,'GiB');
        efi_console_output_string(systemtable,#13#10);
       end;
      efi_console_output_string(systemtable,'Do you want to format the empty disk to TYDQ File System(Y or y is yes,other is no)?'#13#10);
@@ -394,21 +412,21 @@ begin
         efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
         efi_console_read_string(systemtable,mystr);
         emptynum:=PWCharToUint(mystr);
-       while(emptynum>edl2.disk_count) do
-        begin
-         if(emptynum>edl2.disk_count) then
-          begin
-           efi_console_output_string(systemtable,'Error:Total Number is too large that exceed the empty disk total number.');
-          end
-         else if(emptynum=0) then
-          begin
-           efi_console_output_string(systemtable,'Error:Total Number must be larger than 0.');
-          end;
-         efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
-         efi_console_read_string(systemtable,mystr);
-         emptynum:=PWCharToUint(mystr);
-         Wstrfree(mystr);
-        end;
+        while(emptynum>edl2.disk_count) do
+         begin
+          if(emptynum>edl2.disk_count) then
+           begin
+            efi_console_output_string(systemtable,'Error:Total Number is too large that exceed the empty disk total number.');
+           end
+          else if(emptynum=0) then
+           begin
+            efi_console_output_string(systemtable,'Error:Total Number must be larger than 0.');
+           end;
+          efi_console_output_string(systemtable,'Please input the empty disks'#39' Total Number to format them to TYDQ File System:');
+          efi_console_read_string(systemtable,mystr);
+          emptynum:=PWCharToUint(mystr);
+          Wstrfree(mystr);
+         end;
        if(emptynum<=edl2.disk_count) then
         begin
          i:=0;
@@ -421,8 +439,12 @@ begin
            efi_console_read_String(systemtable,mystr);
            emptyindex:=PWcharToUint(mystr);
            Wstrfree(mystr);
-           ((edl2.disk_content+emptyindex-1)^)^.ReadDisk((edl2.disk_content+emptyindex-1)^,
-           ((edl2.disk_block_content+emptyindex-1)^)^.Media^.MediaId,0,8,verifydata);
+           if(emptyindex<=edl2.disk_count) and (emptyindex>=1) then
+            begin
+             ((edl2.disk_content+emptyindex-1)^)^.ReadDisk((edl2.disk_content+emptyindex-1)^,
+             ((edl2.disk_block_content+emptyindex-1)^)^.Media^.MediaId,0,8,verifydata);
+            end
+           else verifydata:=$0000000000000000;
            if(emptyindex>edl2.disk_count) or (emptyindex=0) then
             begin
              efi_console_output_string(systemtable,'Error:Invaild Disk.'+#13#10);
@@ -451,7 +473,7 @@ begin
                efi_console_output_string(systemtable,#39's name(Name length DO NOT exceeds to 255):');
                efi_console_read_string(systemtable,mystr);
               end;
-             efi_disk_tydq_set_fs(systemtable,edl2,emptyindex);
+             efi_disk_tydq_set_fs(edl2,emptyindex);
              tydq_fs_initialize(edl2,emptyindex,mystr);
              Wstrfree(mystr); freemem(edl3.disk_block_content); freemem(edl3.disk_content); edl3.disk_count:=0;
              edl3:=efi_disk_tydq_get_fs_list(systemtable);
@@ -475,36 +497,40 @@ begin
                     begin
                      efi_console_output_string(systemtable,'Set your account name(Name length must be in 1-128):');
                      efi_console_read_string(systemtable,mystr);
-                   while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) or (tydq_fs_legal_filename(mystr)=false) do
-                    begin
-                     if(tydq_fs_legal_filename(mystr)=false) then
-                     efi_console_output_string(systemtable,'Error:Account name is illegal(space,* or ? is illegal character).'#10)
-                     else efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10);
-                     efi_console_output_string(systemtable,'Set your account name:');
-                     efi_console_read_string(systemtable,mystr);
+                     while(Wstrlen(mystr)=0) or (Wstrlen(mystr)>128) or (tydq_fs_legal_filename(mystr)=false) do
+                      begin
+                       if(tydq_fs_legal_filename(mystr)=false) then
+                       efi_console_output_string(systemtable,'Error:Account name is illegal(space,* or ? is illegal character).'#10)
+                       else efi_console_output_string(systemtable,'Error:Account Name is invaild.'#10);
+                       efi_console_output_string(systemtable,'Set your account name:');
+                       efi_console_read_string(systemtable,mystr);
+                      end;
+                     efi_console_output_string(systemtable,'Set your account password(Password length must be in 1-128):');
+                     efi_console_read_password_string(systemtable,mystr2);
+                     while(Wstrlen(mystr2)=0) or (Wstrlen(mystr2)>128) do
+                      begin
+                       efi_console_output_string(systemtable,'Error:Account password is invaild.'#10);
+                       efi_console_output_string(systemtable,'Set your account name:');
+                       efi_console_read_string(systemtable,mystr);
+                      end;
+                     efi_console_output_string(systemtable,'Verify your account password:');
+                     efi_console_read_password_string(systemtable,mystr3);
+                     while(Wstrcmp(mystr2,mystr3)<>0) or (WStrlen(mystr2)<>Wstrlen(mystr3)) do
+                      begin
+                       efi_console_output_string(systemtable,'Error:Typed password does not match your password.'#10);
+                       efi_console_output_string(systemtable,'Verify your account password:');
+                       efi_console_read_password_string(systemtable,mystr3);
+                      end;
+                     tydq_fs_systeminfo_add_user(fsi,mystr,mystr2,true);
+                     tydq_fs_systeminfo_write(systemtable,edl2,fsi);
+                     Wstrfree(mystr3); Wstrfree(mystr2);
                     end;
-                   efi_console_output_string(systemtable,'Set your account password(Password length must be in 1-128):');
-                   efi_console_read_password_string(systemtable,mystr2);
-                   while(Wstrlen(mystr2)=0) or (Wstrlen(mystr2)>128) do
-                    begin
-                     efi_console_output_string(systemtable,'Error:Account password is invaild.'#10);
-                     efi_console_output_string(systemtable,'Set your account name:');
-                     efi_console_read_string(systemtable,mystr);
-                    end;
-                  efi_console_output_string(systemtable,'Verify your account password:');
-                  efi_console_read_password_string(systemtable,mystr3);
-                  while(Wstrcmp(mystr2,mystr3)<>0) or (WStrlen(mystr2)<>Wstrlen(mystr3)) do
-                   begin
-                    efi_console_output_string(systemtable,'Error:Typed password does not match your password.'#10);
-                    efi_console_output_string(systemtable,'Verify your account password:');
-                    efi_console_read_password_string(systemtable,mystr3);
-                   end;
-                   tydq_fs_systeminfo_add_user(fsi,mystr,mystr2,true);
-                   tydq_fs_systeminfo_write(systemtable,edl2,fsi);
-                   Wstrfree(mystr3); Wstrfree(mystr2);
+                   Wstrfree(mystr);
+                  end
+                 else
+                  begin
+                   efi_console_output_string(systemtable,'You will create the account later when entering the system.'#10);
                   end;
-                  Wstrfree(mystr);
-                 end;
                 end
                else
                 begin

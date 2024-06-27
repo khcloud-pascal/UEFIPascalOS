@@ -2,14 +2,20 @@ unit console;
 
 interface
 
+{$MODE FPC}
+
 uses tydqfs,uefi;
 
-{$POINTERMATH ON}
 type cmdpartstr=record
                 partstrnum:natuint;
                 partstrlist:^PWideChar;
                 end;
+     cmdshellline=record
+                   shellline:^PWideChar;
+                   shelllinecount:natuint;
+                   end;  
 procedure console_main(systemtable:Pefi_system_table;var sysinfo:tydqfs_system_info;var sysindex:natuint);
+procedure console_shell_parser(systemtable:Pefi_system_table;var sysinfo:tydqfs_system_info;var sysindex:natuint;shellstr:PWideChar);
 procedure console_command_parser(systemtable:Pefi_system_table;var sysinfo:tydqfs_system_info;var sysindex:natuint;cmdstr:PWideChar);
 procedure console_initialize(systemtable:Pefi_system_table;sysinfo:tydqfs_system_info;sysindex:natuint);
 
@@ -60,6 +66,36 @@ begin
    freemem(cmdstr); freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
   end;
 end;
+procedure console_shell_parser(systemtable:Pefi_system_table;var sysinfo:tydqfs_system_info;var sysindex:natuint;shellstr:PWideChar);[public,alias:'console_shell_parser'];
+var cmdline:cmdshellline;
+    partstr:PWideChar;
+    i,i1,i2,l,len:natuint;
+    pptr:natuint;
+begin
+ i1:=1; i2:=2; i:=0; len:=Wstrlen(shellstr);
+ cmdline.shelllinecount:=Wstrcount(shellstr,#10,1)+1;
+ cmdline.shellline:=allocmem(sizeof(natuint)*cmdline.shelllinecount);
+ while(i<cmdline.shelllinecount) do
+  begin
+   inc(i);
+   i2:=Wstrpos(shellstr,#10,i1+1);
+   if((shellstr+i1)^=' ') then inc(i1);
+   if(i2>0) then
+   (cmdline.shellline+i-1)^:=Wstrcutout(shellstr,i1+1,i2-1)
+   else
+   (cmdline.shellline+i-1)^:=Wstrcutout(shellstr,i1+1,len);
+   i1:=i2;
+  end;
+ pptr:=1;
+ while(pptr<=cmdline.shelllinecount) do
+  begin
+   Wstrinit(partstr,32768);
+   Wstrset(partstr,(cmdline.shellline+pptr-1)^);
+   console_command_parser(systemtable,sysinfo,sysindex,partstr);
+   Wstrfree(partstr);
+   inc(pptr);
+  end;
+end; 
 procedure console_command_parser(systemtable:Pefi_system_table;var sysinfo:tydqfs_system_info;var sysindex:natuint;cmdstr:PWideChar);[public,alias:'console_command_parser'];
 var cpstr:cmdpartstr;
     procnum,procnum2,procnum3,procnum4,procnum5,procnum6:natuint;
@@ -73,6 +109,7 @@ var cpstr:cmdpartstr;
     fsf:tydqfs_file;
     fsfl:tydqfs_file_list;
     data:tydqfs_data;
+    fse:tydqfs_file_executable;
 begin
  len:=Wstrlen(cmdstr); cpstr.partstrnum:=0; partstart:=0; partlen:=0; isstring:=false;
  for i:=1 to len do
@@ -94,9 +131,18 @@ begin
      ReallocMem(cpstr.partstrlist,sizeof(PWideChar)*cpstr.partstrnum);
      if(cpstr.partstrnum>1) then
      (cpstr.partstrlist+cpstr.partstrnum-2)^:=PWideChar(Pointer((cpstr.partstrlist+cpstr.partstrnum-2)^)-size);
-     Wstrinit((cpstr.partstrlist+cpstr.partstrnum-1)^,partlen);
-     partstr:=Wstrcopy(cmdstr,partstart,partlen);
-     Wstrset((cpstr.partstrlist+cpstr.partstrnum-1)^,partstr);
+     if((cmdstr+i-1)^='"') or ((cmdstr+i-1)^=#39) then
+      begin
+       Wstrinit((cpstr.partstrlist+cpstr.partstrnum-1)^,partlen-2);
+       partstr:=Wstrcopy(cmdstr,partstart+1,partlen-2);
+       Wstrset((cpstr.partstrlist+cpstr.partstrnum-1)^,partstr);
+      end
+     else
+      begin
+       Wstrinit((cpstr.partstrlist+cpstr.partstrnum-1)^,partlen);
+       partstr:=Wstrcopy(cmdstr,partstart,partlen);
+       Wstrset((cpstr.partstrlist+cpstr.partstrnum-1)^,partstr);
+      end;
      freemem(partstr);
      partstart:=0;
      partlen:=0;
@@ -106,7 +152,12 @@ begin
      inc(partlen);
     end;
   end; 
- ismanager:=sysindex<>tydq_fs_systeminfo_get_manager_index(sysinfo);
+ if(cpstr.partstrnum=0) or (len=0) then
+  begin
+   efi_console_output_string(systemtable,'Please enter the command to operate the system!'#10);
+   exit;
+  end;
+ ismanager:=sysindex=tydq_fs_systeminfo_get_manager_index(sysinfo);
  if(Wstrcmp(cpstr.partstrlist^,'sp')=0) and (Wstrlen(cpstr.partstrlist^)=2) and (ismanager=true) then
   begin
    if(cpstr.partstrnum<=1) then
@@ -151,7 +202,7 @@ begin
     begin
      if(cpstr.partstrnum=3) then
       begin
-       partstr:=Wstrcutout((cpstr.partstrlist+2)^,2,Wstrlen((cpstr.partstrlist+2)^)-1);
+       partstr:=Wstrcutout((cpstr.partstrlist+2)^,1,Wstrlen((cpstr.partstrlist+2)^));
        efi_console_output_string(systemtable,partstr);
        Wstrfree(partstr);
        efi_console_output_string(systemtable,#10);
@@ -247,7 +298,7 @@ begin
        edl:=efi_disk_tydq_get_fs_list(systemtable);
        partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+3)^);
        procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+3)^);
-       if(tydq_fs_legal_filename(partstr5)) then
+       if(tydq_fs_legal_filename(partstr5)) and (tydq_fs_legal_length_filename(partstr5)) then
         begin
          attributes:=0; shared:=false; Wstrfree(partstr5);
          for j:=5 to cpstr.partstrnum do
@@ -279,10 +330,6 @@ begin
            else if(Wstrcmp((cpstr.partstrlist+j-1)^,'binary')=0) and (WStrlen((cpstr.partstrlist+j-1)^)=6) then
             begin
              attributes:=attributes or tydqfs_binary_file; 
-            end
-           else if(Wstrcmp((cpstr.partstrlist+j-1)^,'executable')=0) and (WStrlen((cpstr.partstrlist+j-1)^)=10) then
-            begin
-             attributes:=attributes or tydqfs_executable_file;
             end
            else if(Wstrcmp((cpstr.partstrlist+j-1)^,'shared')=0) and (Wstrlen((cpstr.partstrlist+j-1)^)=6) then
             begin
@@ -348,7 +395,10 @@ begin
         end
        else
         begin
-         efi_console_output_string(systemtable,'Error:file name is illegal(space,* or ? are illegal).'#10);
+         if(tydq_fs_legal_filename(partstr5)=false) then
+         efi_console_output_string(systemtable,'Error:file name is illegal(?,*,$,{,},(,),@,#,^ or % are illegal).'#10)
+         else if(tydq_fs_legal_length_filename(partstr5)=false) then
+         efi_console_output_string(systemtable,'Error:file name length is illegal(length must not exceed 255 and lower to 0).'#10);
          Wstrfree(partstr5);
          freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
          for i:=cpstr.partstrnum downto 1 do
@@ -778,6 +828,20 @@ begin
        edl:=efi_disk_tydq_get_fs_list(systemtable);
        partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+3)^);
        procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+3)^);
+       if(tydq_fs_legal_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name is illegal(?,*,$,{,},(,),@,#,^ or % are illegal).'#10)
+       else if(tydq_fs_legal_length_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name length is illegal(length must not exceed 255 and lower to 0).'#10);
+       if(tydq_fs_legal_filename(partstr5)=false) or (tydq_fs_legal_length_filename(partstr5)=false) then
+        begin
+         Wstrfree(partstr5); freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
        if(tydq_fs_file_exists(edl,procnum,partstr5)=false) then
         begin
          attributes:=tydqfs_text_file; shared:=false;
@@ -853,6 +917,20 @@ begin
        edl:=efi_disk_tydq_get_fs_list(systemtable);
        partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+3)^);
        procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+3)^);
+       if(tydq_fs_legal_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name is illegal(?,*,$,{,},(,),@,#,^ or % are illegal).'#10)
+       else if(tydq_fs_legal_length_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name length is illegal(length must not exceed 255 and lower to 0).'#10);
+       if(tydq_fs_legal_filename(partstr5)=false) or (tydq_fs_legal_length_filename(partstr5)=false) then
+        begin
+         Wstrfree(partstr5); freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
        if(tydq_fs_file_exists(edl,procnum,partstr5)=false) then
         begin
          attributes:=tydqfs_binary_file; shared:=false;
@@ -1057,6 +1135,20 @@ begin
        edl:=efi_disk_tydq_get_fs_list(systemtable);
        partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+3)^);
        procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+3)^);
+       if(tydq_fs_legal_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name is illegal(?,*,$,{,},(,),@,#,^ or % are illegal).'#10)
+       else if(tydq_fs_legal_length_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name length is illegal(length must not exceed 255 and lower to 0).'#10);
+       if(tydq_fs_legal_filename(partstr5)=false) or (tydq_fs_legal_length_filename(partstr5)=false) then
+        begin
+         Wstrfree(partstr5); freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
        partstr6:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+4)^);
        procnum2:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+4)^);
        attributes:=tydqfs_link_file; shared:=false;
@@ -1150,6 +1242,152 @@ begin
        tydq_fs_file_rewrite(systemtable,edl,procnum,partstr5,partstr,(Wstrlen(partstr)+1)*2,userlevel_system,1);
        Wstrfree(partstr); Wstrfree(partstr6); Wstrfree(partstr5); 
        freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+      end
+     else if(WstrCmp((cpstr.partstrlist+2)^,'readexe')=0) and (Wstrlen((cpstr.partstrlist+2)^)=7) then
+      begin
+       if(cpstr.partstrnum<>4) then
+        begin
+         efi_console_output_string(systemtable,'file readexe must have only one path!'#10);
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
+       edl:=efi_disk_tydq_get_fs_list(systemtable);
+       partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+3)^);
+       procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+3)^);
+       fsf:=tydq_fs_file_info(edl,procnum,partstr5,userlevel_system,1);
+       if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[1]<>true) then
+        begin
+         efi_console_output_string(systemtable,'File is not an executable file,reading failed.');
+         freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
+       fse:=tydq_fs_read_executable(edl,procnum,partstr5);
+       if(fse.exesignature<>tydqfs_executable_signature) then
+        begin
+         efi_console_output_string(systemtable,'File is not an vaild TYDQ System executable file,reading failed.');
+        end
+       else
+        begin
+         efi_console_output_string(systemtable,'Executable Format:TYDQ System Executable file(64 bits)'#10);
+         if(fse.exetype=tydqfs_executable_exec) then
+          begin
+           efi_console_output_string(systemtable,'Executable Type:Executable file'#10);
+          end
+         else if(fse.exetype=tydqfs_executable_target) then
+          begin
+           efi_console_output_string(systemtable,'Executable Type:Target file'#10);
+          end
+         else if(fse.exetype=tydqfs_executable_relocatable) then
+          begin
+           efi_console_output_string(systemtable,'Executable Type:Relocatable file'#10);
+          end
+         else if(fse.exetype=tydqfs_executable_staticlib) then
+          begin
+           efi_console_output_string(systemtable,'Executable Type:Static Library'#10);
+          end
+         else if(fse.exetype=tydqfs_executable_dynamiclib) then
+          begin
+           efi_console_output_string(systemtable,'Executable Type:Dynamic Library'#10);
+          end;
+         if(fse.exearch=tydqfs_x64) then
+          begin
+           efi_console_output_string(systemtable,'Executable Architecture:X64'#10);
+          end
+         else if(fse.exearch=tydqfs_aa64) then
+          begin
+           efi_console_output_string(systemtable,'Executable Architecture:AArch64'#10);
+          end
+         else if(fse.exearch=tydqfs_loongarch64) then
+          begin
+           efi_console_output_string(systemtable,'Executable Architecture:LoongArch64'#10);
+          end
+         else if(fse.exearch=tydqfs_riscv64) then
+          begin
+           efi_console_output_string(systemtable,'Executable Architecture:RISCV64'#10);
+          end
+         else if(fse.exearch=tydqfs_riscv128) then
+          begin
+           efi_console_output_string(systemtable,'Executable Architecture:RISCV128'#10);
+          end;
+         partstr:=UintToWHex(fse.exeloadaddress);
+         efi_console_output_string(systemtable,'Executable Load Address(If permitted):');
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,#10);
+         Wstrfree(partstr);
+         partstr:=UintToPWChar(fse.exesectionnumber);
+         efi_console_output_string(systemtable,'Total Section Number:');
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,#10);
+         Wstrfree(partstr);
+         for i:=1 to fse.exesectionnumber do
+          begin
+           partstr:=UintToPWChar(i);
+           efi_console_output_string(systemtable,'Section ');
+           efi_console_output_string(systemtable,partstr);
+           efi_console_output_string(systemtable,':'#10);
+           Wstrfree(partstr);
+           efi_console_output_string(systemtable,'Section Name:');
+           efi_console_output_string(systemtable,@(fse.exesection+i-1)^.exename);
+           efi_console_output_string(systemtable,#10);
+           partstr:=UintToWHex((fse.exesection+i-1)^.exesectionbaseaddress);
+           efi_console_output_string(systemtable,'Section Load Address(if permitted):');
+           efi_console_output_string(systemtable,partstr);
+           efi_console_output_string(systemtable,':'#10);
+           Wstrfree(partstr);
+           partstr:=UintToPWChar((fse.exesection+i-1)^.exesectionsize);
+           efi_console_output_string(systemtable,'Section Size:');
+           efi_console_output_string(systemtable,partstr);
+           efi_console_output_string(systemtable,':'#10);
+           Wstrfree(partstr);
+          end;
+        end;
+       tydq_fs_free_executable(fse);
+       freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+      end
+     else if(WstrCmp((cpstr.partstrlist+2)^,'shell')=0) and (Wstrlen((cpstr.partstrlist+2)^)=5) then
+      begin
+       if(cpstr.partstrnum<>4) then
+        begin
+         efi_console_output_string(systemtable,'file shell must have only one path!'#10);
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
+       edl:=efi_disk_tydq_get_fs_list(systemtable);
+       partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+3)^);
+       procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+3)^);
+       fsf:=tydq_fs_file_info(edl,procnum,partstr5,userlevel_system,1);
+       if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[3]=true) then
+        begin
+         data:=tydq_fs_file_read(edl,procnum,partstr5,1,fsf.fContentCount,userlevel_system,1);
+         console_shell_parser(systemtable,sysinfo,sysindex,PWideChar(data.fsdata));
+         freemem(data.fsdata);
+        end
+       else
+        begin
+         efi_console_output_string(systemtable,'The Shell file must be a code text file!'#10);
+        end;
+       Wstrfree(partstr5);
+       freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
+      end
+     else
+      begin
+       efi_console_output_string(systemtable,'Command ');
+       efi_console_output_string(systemtable,(cpstr.partstrlist+2)^);
+       efi_console_output_string(systemtable,' after the command file unrecognized.'#10);
+       efi_console_output_string(systemtable,'Vaild commands can be searched in help manual.'#10);
       end;
     end
    else if(Wstrcmp((cpstr.partstrlist+1)^,'passwd')=0) and (Wstrlen((cpstr.partstrlist+1)^)=6) then
@@ -1234,11 +1472,9 @@ begin
     begin
      efi_console_output_string(systemtable,'Type your new user name(name length must be in 1-128):');
      efi_console_read_string(systemtable,inputstr1);
-     while(Wstrlen(inputstr1)=0) or (Wstrlen(inputstr1)>128) or (tydq_fs_systeminfo_get_index(sysinfo,inputstr1)>=2) or (tydq_fs_legal_filename(inputstr1)=false) do
+     while(Wstrlen(inputstr1)=0) or (Wstrlen(inputstr1)>128) or (tydq_fs_systeminfo_get_index(sysinfo,inputstr1)>=2) do
       begin
-       if(tydq_fs_legal_filename(inputstr1)=false) then 
-       efi_console_output_string(systemtable,'Error:Account name is illegal(space,* or ? is illegal character).'#10)
-       else if(Wstrlen(inputstr1)=0) or (Wstrlen(inputstr1)>128) then
+       if(Wstrlen(inputstr1)=0) or (Wstrlen(inputstr1)>128) then
        efi_console_output_string(systemtable,'Error:Account name length overflows.'#10)
        else
        efi_console_output_string(systemtable,'Error:The new name is already used.'#10);
@@ -1255,6 +1491,10 @@ begin
        efi_console_output_string(systemtable,'Verify your password:');
        efi_console_read_password_string(systemtable,inputstr3);
       end;
+     tydq_fs_systeminfo_add_user(sysinfo,inputstr1,inputstr2,false);
+     edl:=efi_disk_tydq_get_fs_list(systemtable);
+     tydq_fs_systeminfo_write(systemtable,edl,sysinfo);
+     Freemem(edl.disk_block_content); Freemem(edl.disk_content); edl.disk_count:=0;
      efi_console_output_string(systemtable,'You successfully add a new user!'#10);
      Wstrfree(inputstr3); Wstrfree(inputstr2); Wstrfree(inputstr1);
     end
@@ -1278,6 +1518,9 @@ begin
        efi_console_read_string(systemtable,inputstr1);
       end;
      tydq_fs_systeminfo_delete_user(sysinfo,inputstr1);
+     edl:=efi_disk_tydq_get_fs_list(systemtable);
+     tydq_fs_systeminfo_write(systemtable,edl,sysinfo);
+     Freemem(edl.disk_block_content); Freemem(edl.disk_content); edl.disk_count:=0;
      efi_console_output_string(systemtable,'You successfully delete a exist user!'#10);
      Wstrfree(inputstr1);
     end
@@ -1311,15 +1554,68 @@ begin
        efi_console_output_string(systemtable,@fsh.RootName);
        efi_console_output_string(systemtable,#10);
        efi_console_output_string(systemtable,'Maximum Size:');
-       partstr:=UintToPWChar(fsh.maxsize);
-       efi_console_output_string(systemtable,partstr);
+       if(fsh.maxsize>=1024*1024*1024*1024) then
+        begin
+         partstr:=ExtendedToPWChar(fsh.maxsize/(1024*1024*1024*1024),2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'TiB'#10);
+        end
+       else if(fsh.maxsize>=1024*1024*1024) then
+        begin
+         partstr:=ExtendedToPWChar(fsh.maxsize/(1024*1024*1024),2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'GiB'#10);
+        end
+       else if(fsh.maxsize>=1024*1024) then
+        begin
+         partstr:=ExtendedToPWChar(fsh.maxsize/(1024*1024),2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'MiB'#10);
+        end
+       else if(fsh.maxsize>=1024) then
+        begin
+         partstr:=ExtendedToPWChar(fsh.maxsize/1024,2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'KiB'#10);
+        end
+       else if(fsh.maxsize>=0) then
+        begin
+         partstr:=ExtendedToPWChar(fsh.maxsize,2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'B'#10);
+        end;
        Wstrfree(partstr);
-       efi_console_output_string(systemtable,' Bytes'#10);
-       efi_console_output_string(systemtable,'Used Size:');
-       partstr:=UintToPWChar(fsh.usedsize);
-       efi_console_output_string(systemtable,partstr);
+       if(fsh.usedsize>=1024*1024*1024*1024) then
+        begin
+         partstr:=ExtendedToPWChar(fsh.usedsize/(1024*1024*1024*1024),2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'TiB'#10);
+        end
+       else if(fsh.usedsize>=1024*1024*1024) then
+        begin
+         partstr:=ExtendedToPWChar(fsh.usedsize/(1024*1024*1024),2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'GiB'#10);
+        end
+       else if(fsh.usedsize>=1024*1024) then
+        begin
+         partstr:=ExtendedToPWChar(fsh.usedsize/(1024*1024),2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'MiB'#10);
+        end
+       else if(fsh.usedsize>=1024) then
+        begin
+         partstr:=ExtendedToPWChar(fsh.usedsize/1024,2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'KiB'#10);
+        end
+       else if(fsh.usedsize>0) then
+        begin
+         partstr:=ExtendedToPWChar(fsh.usedsize,2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'B'#10);
+        end;
        Wstrfree(partstr);
-       efi_console_output_string(systemtable,' Bytes'#10);
       end;
      freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
     end
@@ -1378,13 +1674,76 @@ begin
      else if(procnum=1) then efi_console_output_string(systemtable,'System Architecture:aarch64'#10)
      else if(procnum=2) then efi_console_output_string(systemtable,'System Architecture:loongarch64'#10);
     end
+   else if(WstrCmp((cpstr.partstrlist+1)^,'sysctl')=0) and (WStrlen((cpstr.partstrlist+1)^)=6) then
+    begin
+     if(cpstr.partstrnum<4) then
+      begin
+       efi_console_output_string(systemtable,'sysctl must have an option name and option value(disabled or enabled).'#10);
+       for i:=cpstr.partstrnum downto 1 do
+        begin
+         Wstrfree((cpstr.partstrlist+i-1)^);
+        end;
+       freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+       exit;
+      end;
+     if(Wstrcmp((cpstr.partstrlist+2)^,'graphics')=0) and (Wstrlen((cpstr.partstrlist+2)^)=8) then
+      begin
+       if(Wstrcmp((cpstr.partstrlist+3)^,'disabled')=0) and (Wstrlen((cpstr.partstrlist+3)^)=8) then
+        begin
+         sysinfo.header.tydqgraphics:=false;
+         efi_console_output_string(systemtable,'Please reboot the system to take effect this system option.'#10);
+        end
+       else if(Wstrcmp((cpstr.partstrlist+3)^,'enabled')=0) and (Wstrlen((cpstr.partstrlist+3)^)=7) then
+        begin
+         sysinfo.header.tydqgraphics:=true;
+         efi_console_output_string(systemtable,'Please reboot the system to take effect this system option.'#10);
+        end
+       else
+        begin
+         efi_console_output_string(systemtable,'Option Value ');
+         efi_console_output_string(systemtable,(cpstr.partstrlist+3)^);
+         efi_console_output_string(systemtable,' is invaild,vaild option value:disabled/enabled.'#10);
+        end;
+       edl:=efi_disk_tydq_get_fs_list(systemtable);
+       tydq_fs_systeminfo_write(systemtable,edl,sysinfo);
+       Freemem(edl.disk_block_content); Freemem(edl.disk_content); edl.disk_count:=0;
+      end
+     else if(Wstrcmp((cpstr.partstrlist+2)^,'network')=0) and (Wstrlen((cpstr.partstrlist+2)^)=7) then
+      begin
+       if(Wstrcmp((cpstr.partstrlist+3)^,'disabled')=0) and (Wstrlen((cpstr.partstrlist+3)^)=8) then
+        begin
+         sysinfo.header.tydqnetwork:=false;
+         efi_console_output_string(systemtable,'Please reboot the system to take effect this system option.'#10);
+        end
+       else if(Wstrcmp((cpstr.partstrlist+3)^,'enabled')=0) and (Wstrlen((cpstr.partstrlist+3)^)=7) then
+        begin
+         sysinfo.header.tydqnetwork:=true;
+         efi_console_output_string(systemtable,'Please reboot the system to take effect this system option.'#10);
+        end
+       else
+        begin
+         efi_console_output_string(systemtable,'Option Value ');
+         efi_console_output_string(systemtable,(cpstr.partstrlist+3)^);
+         efi_console_output_string(systemtable,' is invaild,vaild option value:disabled/enabled.'#10);
+        end;
+       edl:=efi_disk_tydq_get_fs_list(systemtable);
+       tydq_fs_systeminfo_write(systemtable,edl,sysinfo);
+       Freemem(edl.disk_block_content); Freemem(edl.disk_content); edl.disk_count:=0;
+      end
+     else 
+      begin
+       efi_console_output_string(systemtable,'This option ');
+       efi_console_output_string(systemtable,(cpstr.partstrlist+2)^);
+       efi_console_output_string(systemtable,' is invaild,please try option graphics/network.'#10);
+      end;
+    end
    else if(Wstrcmp((cpstr.partstrlist+1)^,'help')=0) and (WStrlen((cpstr.partstrlist+1)^)=4) then
     begin
      if(cpstr.partstrnum<=2) then
       begin
        efi_console_output_string(systemtable,'You need to type a command to show the help manual of it.'#10);
        efi_console_output_string(systemtable,'Vaild commands:sp reboot shutdown echo delay file passwd usrname path'#10);
-       efi_console_output_string(systemtable,'addusr delusr lsuser lsdisk logout help sysver sysname sysarch sysinfo'#10);
+       efi_console_output_string(systemtable,'addusr delusr lsuser lsdisk logout help sysver sysname sysarch sysinfo sysctl'#10);
       end
      else if(Wstrcmp((cpstr.partstrlist+2)^,'sp')=0) and (WStrlen((cpstr.partstrlist+2)^)=2) then
       begin
@@ -1418,13 +1777,13 @@ begin
          efi_console_output_string(systemtable,'Please type the vaild command after the command file:'#10);
          efi_console_output_string(systemtable,'create list tree info copy delete exist edit edithex'#10);
          efi_console_output_string(systemtable,'createandedit createandedithex showtext showhex createlink'#10);
-         efi_console_output_string(systemtable,'openlink resetlink'#10);
+         efi_console_output_string(systemtable,'openlink resetlink readexe shell'#10);
          efi_console_output_string(systemtable,'Usage:file <command> <parameters>'#10);
         end 
        else if(WStrcmp((cpstr.partstrlist+3)^,'create')=0) and (Wstrlen((cpstr.partstrlist+3)^)=6) then
         begin
          efi_console_output_string(systemtable,'Create a specified file in specified path.'#10);
-         efi_console_output_string(systemtable,'Usage:file create <path><folder/link/text/binary/executable>'#10);
+         efi_console_output_string(systemtable,'Usage:file create <path><folder/link/text/binary>'#10);
          efi_console_output_string(systemtable,'<normal/system><hidden><shared>'#10);
         end
        else if(WStrcmp((cpstr.partstrlist+3)^,'list')=0) and (Wstrlen((cpstr.partstrlist+3)^)=4) then
@@ -1510,6 +1869,16 @@ begin
          efi_console_output_string(systemtable,'Reset a specified link file'#39's link to specified path.'#10);
          efi_console_output_string(systemtable,'Usage:file resetlink <path><pathto>'#10);
         end
+       else if(Wstrcmp((cpstr.partstrlist+3)^,'readexe')=0) and (Wstrlen((cpstr.partstrlist+3)^)=7) then
+        begin
+         efi_console_output_string(systemtable,'Read an specified TYDQ System Executable File to get its information.'#10);
+         efi_console_output_string(systemtable,'Usage:file readexe <path>'#10);
+        end
+      else if(Wstrcmp((cpstr.partstrlist+3)^,'shell')=0) and (Wstrlen((cpstr.partstrlist+3)^)=5) then
+        begin
+         efi_console_output_string(systemtable,'Read an specified TYDQ System Text File to execute its command.'#10);
+         efi_console_output_string(systemtable,'Usage:file shell <path>'#10);
+        end
        else
         begin
          efi_console_output_string(systemtable,'Command ');
@@ -1518,7 +1887,7 @@ begin
          efi_console_output_string(systemtable,'Please type the vaild command after the command file:'#10);
          efi_console_output_string(systemtable,'create list tree info copy delete exist edit edithex'#10);
          efi_console_output_string(systemtable,'createandedit createandedithex showtext showhex createlink'#10);
-         efi_console_output_string(systemtable,'openlink resetlink'#10);
+         efi_console_output_string(systemtable,'openlink resetlink readexe shell'#10);
         end;
       end
      else if(WStrcmp((cpstr.partstrlist+2)^,'passwd')=0) and (WStrlen((cpstr.partstrlist+2)^)=6) then
@@ -1548,7 +1917,7 @@ begin
       begin
        efi_console_output_string(systemtable,'Tips:you must use the sp command to use delusr when you are user manager.'#10);
        efi_console_output_string(systemtable,'Delete a specified user to the TYDQ System.'#10);
-       efi_console_output_string(systemtable,'Usage:sp addusr'#10);
+       efi_console_output_string(systemtable,'Usage:sp delusr'#10);
       end
      else if(WStrcmp((cpstr.partstrlist+2)^,'lsuser')=0) and (Wstrlen((cpstr.partstrlist+2)^)=6) then
       begin
@@ -1560,7 +1929,7 @@ begin
       begin
        efi_console_output_string(systemtable,'Tips:you must use the sp command to use addusr when you are user manager.'#10);
        efi_console_output_string(systemtable,'List all available disks of the TYDQ System.'#10);
-       efi_console_output_string(systemtable,'Usage:sp addusr'#10);
+       efi_console_output_string(systemtable,'Usage:sp lsdisk'#10);
       end
      else if(WStrcmp((cpstr.partstrlist+2)^,'logout')=0) and (Wstrlen((cpstr.partstrlist+2)^)=6) then
       begin
@@ -1592,6 +1961,12 @@ begin
        efi_console_output_string(systemtable,'Show all system information of TYDQ System.'#10);
        efi_console_output_string(systemtable,'Usage:sysinfo'#10);
       end
+     else if(WStrcmp((cpstr.partstrlist+2)^,'sysctl')=0) and (Wstrlen((cpstr.partstrlist+2)^)=6) then
+      begin
+       efi_console_output_string(systemtable,'Tips:you must use the sp command to use sysctl when you are user manager.'#10);
+       efi_console_output_string(systemtable,'Change the system option value to enable the function or disable it.'#10);
+       efi_console_output_string(systemtable,'Usage:sp sysctl graphics/network disabled/enabled'#10);
+      end 
      else
       begin
        efi_console_output_string(systemtable,'Command ');
@@ -1599,7 +1974,7 @@ begin
        efi_console_output_string(systemtable,' unrecognized,'#10);
        efi_console_output_string(systemtable,'So please type vaild command to show help manual!'#10);
        efi_console_output_string(systemtable,'Vaild commands:sp reboot shutdown echo delay file passwd usrname path'#10);
-       efi_console_output_string(systemtable,'addusr delusr lsuser lsdisk logout help sysver sysname sysarch sysinfo'#10);
+       efi_console_output_string(systemtable,'addusr delusr lsuser lsdisk logout help sysver sysname sysarch sysinfo sysctl'#10);
       end;
     end
    else if(cpstr.partstrnum>=2) then
@@ -1653,7 +2028,7 @@ begin
     begin
      if(cpstr.partstrnum=2) then
       begin
-       partstr:=Wstrcutout((cpstr.partstrlist+1)^,2,Wstrlen((cpstr.partstrlist+1)^)-1);
+       partstr:=Wstrcutout((cpstr.partstrlist+1)^,1,Wstrlen((cpstr.partstrlist+1)^));
        efi_console_output_string(systemtable,partstr);
        Wstrfree(partstr);
        efi_console_output_string(systemtable,#10);
@@ -1749,7 +2124,7 @@ begin
        edl:=efi_disk_tydq_get_fs_list(systemtable);
        partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+2)^);
        procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+2)^);
-       if(tydq_fs_legal_filename(partstr5)) then
+       if(tydq_fs_legal_filename(partstr5)) and (tydq_fs_legal_length_filename(partstr5)) then
         begin
          attributes:=0; shared:=false; Wstrfree(partstr5);
          for j:=4 to cpstr.partstrnum do
@@ -1781,10 +2156,6 @@ begin
            else if(Wstrcmp((cpstr.partstrlist+j-1)^,'binary')=0) and (WStrlen((cpstr.partstrlist+j-1)^)=6) then
             begin
              attributes:=attributes or tydqfs_binary_file; 
-            end
-           else if(Wstrcmp((cpstr.partstrlist+j-1)^,'executable')=0) and (WStrlen((cpstr.partstrlist+j-1)^)=10) then
-            begin
-             attributes:=attributes or tydqfs_executable_file;
             end
            else if(Wstrcmp((cpstr.partstrlist+j-1)^,'shared')=0) and (Wstrlen((cpstr.partstrlist+j-1)^)=6) then
             begin
@@ -1860,7 +2231,10 @@ begin
         end
        else
         begin
-         efi_console_output_string(systemtable,'Error:file name is illegal(space,* or ? are illegal).'#10);
+         if(tydq_fs_legal_filename(partstr5)=false) then
+         efi_console_output_string(systemtable,'Error:file name is illegal(?,*,$,{,},(,),@,#,^ or % are illegal)..'#10)
+         else if(tydq_fs_legal_length_filename(partstr5)=false) then
+         efi_console_output_string(systemtable,'Error:file name length is illegal(length must not exceed 255 and lower to 0).'#10);
          Wstrfree(partstr5);
          freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
          for i:=cpstr.partstrnum downto 1 do
@@ -2298,8 +2672,22 @@ begin
          exit;
         end;
        edl:=efi_disk_tydq_get_fs_list(systemtable);
-       partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+3)^);
-       procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+3)^);
+       partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+2)^);
+       procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+2)^);
+       if(tydq_fs_legal_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name is illegal(?,*,$,{,},(,),@,#,^ or % are illegal).'#10)
+       else if(tydq_fs_legal_length_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name length is illegal(length must not exceed 255 and lower to 0).'#10);
+       if(tydq_fs_legal_filename(partstr5)=false) or (tydq_fs_legal_length_filename(partstr5)=false) then
+        begin
+         Wstrfree(partstr5); freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
        if(tydq_fs_file_exists(edl,procnum,partstr5)=false) then
         begin
          attributes:=tydqfs_text_file; shared:=false;
@@ -2384,8 +2772,22 @@ begin
          exit;
         end;
        edl:=efi_disk_tydq_get_fs_list(systemtable);
-       partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+3)^);
-       procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+3)^);
+       partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+2)^);
+       procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+2)^);
+       if(tydq_fs_legal_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name is illegal(?,*,$,{,},(,),@,#,^ or % are illegal).'#10)
+       else if(tydq_fs_legal_length_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name length is illegal(length must not exceed 255 and lower to 0).'#10);
+       if(tydq_fs_legal_filename(partstr5)=false) or (tydq_fs_legal_length_filename(partstr5)=false) then
+        begin
+         Wstrfree(partstr5); freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
        if(tydq_fs_file_exists(edl,procnum,partstr5)=false) then
         begin
          attributes:=tydqfs_binary_file; shared:=false;
@@ -2604,6 +3006,20 @@ begin
        edl:=efi_disk_tydq_get_fs_list(systemtable);
        partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+2)^);
        procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+2)^);
+       if(tydq_fs_legal_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name is illegal(?,*,$,{,},(,),@,#,^ or % are illegal).'#10)
+       else if(tydq_fs_legal_length_filename(partstr5)=false) then
+       efi_console_output_string(systemtable,'Error:file name length is illegal(length must not exceed 255 and lower to 0).'#10);
+       if(tydq_fs_legal_filename(partstr5)=false) or (tydq_fs_legal_length_filename(partstr5)=false) then
+        begin
+         Wstrfree(partstr5); freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
        partstr6:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+3)^);
        procnum2:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+3)^);
        attributes:=tydqfs_link_file; shared:=false;
@@ -2740,6 +3156,152 @@ begin
        tydq_fs_file_rewrite(systemtable,edl,procnum,partstr5,partstr,(Wstrlen(partstr))*2,userlevel_user,sysindex);
        Wstrfree(partstr); Wstrfree(partstr6); Wstrfree(partstr5); 
        freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+      end
+     else if(WstrCmp((cpstr.partstrlist+1)^,'readexe')=0) and (Wstrlen((cpstr.partstrlist+1)^)=7) then
+      begin
+       if(cpstr.partstrnum<>3) then
+        begin
+         efi_console_output_string(systemtable,'file readexe must have only one path!'#10);
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
+       edl:=efi_disk_tydq_get_fs_list(systemtable);
+       partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+2)^);
+       procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+2)^);
+       fsf:=tydq_fs_file_info(edl,procnum,partstr5,userlevel_system,1);
+       if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[1]<>true) then
+        begin
+         efi_console_output_string(systemtable,'File is not an executable file,reading failed.');
+         freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
+       fse:=tydq_fs_read_executable(edl,procnum,partstr5);
+       if(fse.exesignature<>tydqfs_executable_signature) then
+        begin
+         efi_console_output_string(systemtable,'File is not an vaild TYDQ System executable file,reading failed.');
+        end
+       else
+        begin
+         efi_console_output_string(systemtable,'Executable Format:TYDQ System Executable file(64 bits)'#10);
+         if(fse.exetype=tydqfs_executable_exec) then
+          begin
+           efi_console_output_string(systemtable,'Executable Type:Executable file'#10);
+          end
+         else if(fse.exetype=tydqfs_executable_target) then
+          begin
+           efi_console_output_string(systemtable,'Executable Type:Object file'#10);
+          end
+         else if(fse.exetype=tydqfs_executable_relocatable) then
+          begin
+           efi_console_output_string(systemtable,'Executable Type:Relocatable file'#10);
+          end
+         else if(fse.exetype=tydqfs_executable_staticlib) then
+          begin
+           efi_console_output_string(systemtable,'Executable Type:Static Library'#10);
+          end
+         else if(fse.exetype=tydqfs_executable_dynamiclib) then
+          begin
+           efi_console_output_string(systemtable,'Executable Type:Dynamic Library'#10);
+          end;
+         if(fse.exearch=tydqfs_x64) then
+          begin
+           efi_console_output_string(systemtable,'Executable Architecture:X64'#10);
+          end
+         else if(fse.exearch=tydqfs_aa64) then
+          begin
+           efi_console_output_string(systemtable,'Executable Architecture:AArch64'#10);
+          end
+         else if(fse.exearch=tydqfs_loongarch64) then
+          begin
+           efi_console_output_string(systemtable,'Executable Architecture:LoongArch64'#10);
+          end
+         else if(fse.exearch=tydqfs_riscv64) then
+          begin
+           efi_console_output_string(systemtable,'Executable Architecture:RISCV64'#10);
+          end
+         else if(fse.exearch=tydqfs_riscv128) then
+          begin
+           efi_console_output_string(systemtable,'Executable Architecture:RISCV128'#10);
+          end;
+         partstr:=UintToWHex(fse.exeloadaddress);
+         efi_console_output_string(systemtable,'Executable Load Address(If permitted):');
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,#10);
+         Wstrfree(partstr);
+         partstr:=UintToPWChar(fse.exesectionnumber);
+         efi_console_output_string(systemtable,'Total Section Number:');
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,#10);
+         Wstrfree(partstr);
+         for i:=1 to fse.exesectionnumber do
+          begin
+           partstr:=UintToPWChar(i);
+           efi_console_output_string(systemtable,'Section ');
+           efi_console_output_string(systemtable,partstr);
+           efi_console_output_string(systemtable,':'#10);
+           Wstrfree(partstr);
+           efi_console_output_string(systemtable,'Section Name:');
+           efi_console_output_string(systemtable,@(fse.exesection+i-1)^.exename);
+           efi_console_output_string(systemtable,#10);
+           partstr:=UintToWHex((fse.exesection+i-1)^.exesectionbaseaddress);
+           efi_console_output_string(systemtable,'Section Load Address(if permitted):');
+           efi_console_output_string(systemtable,partstr);
+           efi_console_output_string(systemtable,':'#10);
+           Wstrfree(partstr);
+           partstr:=UintToPWChar((fse.exesection+i-1)^.exesectionsize);
+           efi_console_output_string(systemtable,'Section Size:');
+           efi_console_output_string(systemtable,partstr);
+           efi_console_output_string(systemtable,':'#10);
+           Wstrfree(partstr);
+          end;
+        end;
+       tydq_fs_free_executable(fse);
+       freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0; 
+      end
+     else if(WstrCmp((cpstr.partstrlist+1)^,'shell')=0) and (Wstrlen((cpstr.partstrlist+2)^)=5) then
+      begin
+       if(cpstr.partstrnum<>3) then
+        begin
+         efi_console_output_string(systemtable,'file shell must have only one path!'#10);
+         for i:=cpstr.partstrnum downto 1 do
+          begin
+           Wstrfree((cpstr.partstrlist+i-1)^);
+          end;
+         freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+         exit;
+        end;
+       edl:=efi_disk_tydq_get_fs_list(systemtable);
+       partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+2)^);
+       procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+2)^);
+       fsf:=tydq_fs_file_info(edl,procnum,partstr5,userlevel_system,1);
+       if(tydq_fs_byte_to_attribute_bool(fsf.fattribute)[3]=true) then
+        begin
+         data:=tydq_fs_file_read(edl,procnum,partstr5,1,fsf.fContentCount,userlevel_user,sysindex);
+         console_shell_parser(systemtable,sysinfo,sysindex,PWideChar(data.fsdata));
+         freemem(data.fsdata);
+        end
+       else
+        begin
+         efi_console_output_string(systemtable,'The Shell file must be a code text file!'#10);
+        end;
+       Wstrfree(partstr5);
+       freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
+      end
+     else
+      begin
+       efi_console_output_string(systemtable,'Command ');
+       efi_console_output_string(systemtable,(cpstr.partstrlist+1)^);
+       efi_console_output_string(systemtable,' after the command file unrecognized.'#10);
+       efi_console_output_string(systemtable,'Vaild commands can be searched in help manual.'#10);
       end;
     end
    else if(Wstrcmp(cpstr.partstrlist^,'passwd')=0) and (Wstrlen(cpstr.partstrlist^)=6) then
@@ -2875,13 +3437,16 @@ begin
      else if(procnum=1) then efi_console_output_string(systemtable,'System Architecture:aarch64'#10)
      else if(procnum=2) then efi_console_output_string(systemtable,'System Architecture:loongarch64'#10);
     end
+   else if(Wstrcmp(cpstr.partstrlist^,'network')=0) and (WStrlen(cpstr.partstrlist^)=7) then
+    begin
+    end
    else if(Wstrcmp(cpstr.partstrlist^,'help')=0) and (WStrlen(cpstr.partstrlist^)=4) then
     begin
-      if(cpstr.partstrnum<=2) then
+      if(cpstr.partstrnum<=1) then
       begin
        efi_console_output_string(systemtable,'You need to type a command to show the help manual of it.'#10);
        efi_console_output_string(systemtable,'Vaild commands:sp reboot shutdown echo delay file passwd usrname path'#10);
-       efi_console_output_string(systemtable,'addusr delusr lsuser lsdisk logout help sysver sysname sysarch sysinfo'#10);
+       efi_console_output_string(systemtable,'addusr delusr lsuser lsdisk logout help sysver sysname sysarch sysinfo sysctl'#10);
       end
      else if(Wstrcmp((cpstr.partstrlist+1)^,'sp')=0) and (WStrlen((cpstr.partstrlist+1)^)=2) then
       begin
@@ -2915,13 +3480,13 @@ begin
          efi_console_output_string(systemtable,'Please type the vaild command after the command file:'#10);
          efi_console_output_string(systemtable,'create list tree info copy delete exist edit edithex'#10);
          efi_console_output_string(systemtable,'createandedit createandedithex showtext showhex createlink'#10);
-         efi_console_output_string(systemtable,'openlink resetlink'#10);
+         efi_console_output_string(systemtable,'openlink resetlink readexe shell'#10);
          efi_console_output_string(systemtable,'Usage:file <command> <parameters>'#10);
         end 
        else if(WStrcmp((cpstr.partstrlist+2)^,'create')=0) and (Wstrlen((cpstr.partstrlist+2)^)=6) then
         begin
          efi_console_output_string(systemtable,'Create a specified file in specified path.'#10);
-         efi_console_output_string(systemtable,'Usage:file create <path><folder/link/text/binary/executable>'#10);
+         efi_console_output_string(systemtable,'Usage:file create <path><folder/link/text/binary>'#10);
          efi_console_output_string(systemtable,'<normal/system><hidden><shared>'#10);
         end
        else if(WStrcmp((cpstr.partstrlist+2)^,'list')=0) and (Wstrlen((cpstr.partstrlist+2)^)=4) then
@@ -3007,6 +3572,16 @@ begin
          efi_console_output_string(systemtable,'Reset a specified link file'#29's link to specified path.'#10);
          efi_console_output_string(systemtable,'Usage:file resetlink <path><pathto>'#10);
         end
+       else if(Wstrcmp((cpstr.partstrlist+2)^,'readexe')=0) and (Wstrlen((cpstr.partstrlist+2)^)=7) then
+        begin
+         efi_console_output_string(systemtable,'Read an specified TYDQ System Executable File to get its information.'#10);
+         efi_console_output_string(systemtable,'Usage:file readexe <path>'#10);
+        end
+       else if(Wstrcmp((cpstr.partstrlist+2)^,'shell')=0) and (Wstrlen((cpstr.partstrlist+2)^)=5) then
+        begin
+         efi_console_output_string(systemtable,'Read an specified TYDQ System Text File to execute its command.'#10);
+         efi_console_output_string(systemtable,'Usage:file shell <path>'#10);
+        end
        else
         begin
          efi_console_output_string(systemtable,'Command ');
@@ -3015,7 +3590,7 @@ begin
          efi_console_output_string(systemtable,'Please type the vaild command after the command file:'#10);
          efi_console_output_string(systemtable,'create list tree info copy delete exist edit edithex'#10);
          efi_console_output_string(systemtable,'createandedit createandedithex showtext showhex createlink'#10);
-         efi_console_output_string(systemtable,'openlink resetlink'#10);
+         efi_console_output_string(systemtable,'openlink resetlink readexe shell'#10);
         end;
       end
      else if(WStrcmp((cpstr.partstrlist+1)^,'passwd')=0) and (WStrlen((cpstr.partstrlist+1)^)=6) then
@@ -3045,7 +3620,7 @@ begin
       begin
        efi_console_output_string(systemtable,'Tips:you must use the sp command to use delusr when you are user manager.'#10);
        efi_console_output_string(systemtable,'Delete a specified user to the TYDQ System.'#10);
-       efi_console_output_string(systemtable,'Usage:sp addusr'#10);
+       efi_console_output_string(systemtable,'Usage:sp delusr'#10);
       end
      else if(WStrcmp((cpstr.partstrlist+1)^,'lsuser')=0) and (Wstrlen((cpstr.partstrlist+1)^)=6) then
       begin
@@ -3057,7 +3632,7 @@ begin
       begin
        efi_console_output_string(systemtable,'Tips:you must use the sp command to use addusr when you are user manager.'#10);
        efi_console_output_string(systemtable,'List all available disks of the TYDQ System.'#10);
-       efi_console_output_string(systemtable,'Usage:sp addusr'#10);
+       efi_console_output_string(systemtable,'Usage:sp lsdisk'#10);
       end
      else if(WStrcmp((cpstr.partstrlist+1)^,'logout')=0) and (Wstrlen((cpstr.partstrlist+1)^)=6) then
       begin
@@ -3089,6 +3664,12 @@ begin
        efi_console_output_string(systemtable,'Show all system information of TYDQ System.'#10);
        efi_console_output_string(systemtable,'Usage:sysinfo'#10);
       end
+     else if(WStrcmp((cpstr.partstrlist+2)^,'sysctl')=0) and (Wstrlen((cpstr.partstrlist+2)^)=6) then
+      begin
+       efi_console_output_string(systemtable,'Tips:you must use the sp command to use sysctl when you are user manager.'#10);
+       efi_console_output_string(systemtable,'Change the system option value to enable the function or disable it.'#10);
+       efi_console_output_string(systemtable,'Usage:sp sysctl graphics/network disabled/enabled'#10);
+      end 
      else
       begin
        efi_console_output_string(systemtable,'Command ');
@@ -3096,10 +3677,10 @@ begin
        efi_console_output_string(systemtable,' unrecognized,'#10);
        efi_console_output_string(systemtable,'So please type vaild command to show help manual!'#10);
        efi_console_output_string(systemtable,'Vaild commands:sp reboot shutdown echo delay file passwd usrname path'#10);
-       efi_console_output_string(systemtable,'addusr delusr lsuser lsdisk logout help sysver sysname sysarch sysinfo'#10);
+       efi_console_output_string(systemtable,'addusr delusr lsuser lsdisk logout help sysver sysname sysarch sysinfo sysctl'#10);
       end;
     end
-   else if(cpstr.partstrnum=0) then
+   else if(cpstr.partstrnum>=1) then
     begin
      efi_console_output_string(systemtable,'Command ');
      efi_console_output_string(systemtable,cpstr.partstrlist^);

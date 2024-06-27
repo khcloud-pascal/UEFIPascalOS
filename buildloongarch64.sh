@@ -6,7 +6,7 @@
 	/home/tydq/source/compiler/ppcloongarch64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg uefiinstaller.pas
 	/home/tydq/source/compiler/ppcloongarch64 -n -O4 -Si -Sc -Sg -Xd -Ur -CX -XXs -Xi -Cg uefimain.pas
 	objcopy -j .text -j .sdata -j .data -j .dynamic -j .rodata -j .rel -j .rela -j .rel.* -j .rela.* -j .rel* -j .rela* -j .areloc -j .reloc -O efi-app-loongarch64 libuefiinstaller.so installer/bootloongarch64.efi
-	objcopy -j .text -j .sdata -j .data -j .dynamic -j .rodata -j .rel -j .rela -j .rel.* -j .rela.* -j .rel* -j .rela* -j .areloc -j .reloc -O efi-app-loongarch64 libuefimain.so kernel/bootloongarch64.efi
+	objcopy -j .text -j .sdata -j .data -j .dynamic -j .rodata -j .rel -j .rela -j .rel.* -j .rela.* -j .rel* -j .rela* -j .areloc -j .reloc -O efi-app-loongarch64 libuefimain.so kernel/Sysmainloongarch64.efi
 	rm -rf *.o
 	rm -rf *.ppu
 	rm -rf *.dll
