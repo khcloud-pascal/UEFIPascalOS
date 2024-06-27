@@ -1,5 +1,5 @@
 Files in my repository:  
-buildx64.sh and buildaarch64.sh and buildloongarch64.sh:  
+buildx64.sh and buildaarch64.sh and buildloongarch64.sh and buildriscv64(only x64 and aarch64 is vaild):  
 build the iso file for corresponding architecture bare machine or qemu virtual machine.   
 others:    
 source code (free pascal)  
