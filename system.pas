@@ -10,6 +10,8 @@ const maxheap=16777216*12;
 const maxheap=67108864*12;
       maxsection=65536*64;
 {$ENDIF CPU32}
+const exe_heap_content_max_volume=1048576*512;
+      exe_heap_section_max_volume=65536*16;
 type
   hresult = LongInt;
   Char = #0..#255;
@@ -113,34 +115,39 @@ type
       node: array [0 .. 5] of byte; // The spatially unique node identifier
     );
   end;
-  systemheap=record
-	   heapcontent:array[1..maxheap] of byte;
-	   heapsection:array[1..maxsection,1..2] of natuint;
-	   heapcount,heaprest:natuint;
-           end;
-  neighborline=record
+  systemheap=packed record
+	     heapcontent:array[1..maxheap] of byte;
+	     heapsection:array[1..maxsection,1..2] of natuint;
+	     heapcount,heaprest:natuint;
+             end;
+  neighborline=packed record
                lineslen:array[1..3] of natuint;
                linepos:array[1..3] of natuint;
                linelen:byte;
                linestatus:byte;
                end;
-  linelist=record
+  linelist=packed record
            lineleft:^natuint;
            lineright:^natuint;
            linecount:natuint;
            end;
-  maskwildcard=record
+  maskwildcard=packed record
                liststr:^PChar;
                listpos:^natuint;
                listlen:^natuint;
                listcount:natuint;
                end;
-  Wmaskwildcard=record
-               liststr:^PWideChar;
-               listpos:^natuint;
-               listlen:^natuint;
-               listcount:natuint;
-               end;
+  Wmaskwildcard=packed record
+                liststr:^PWideChar;
+                listpos:^natuint;
+                listlen:^natuint;
+                listcount:natuint;
+                end; 
+  executable_heap=packed record
+                  heap_content:array[1..exe_heap_content_max_volume] of word;
+                  heap_section:array[1..exe_heap_section_max_volume,1..2] of natuint;
+                  heap_count,heap_rest_volume:natuint;
+                  end; 
 const mypwd:PChar='PHjueigbEYywLCQiCYRQGleDMUjOceLMBFDMJHEMUzgCleRgkKEnAuVLtSAEFSFhevpEKomPHIbaqxLLGJVMRmZUDFKnvHGfvTwYEOqVaBxEGXMXXuITZixUcMbdTCfWIwysKPSciOnUHgmePRWEWWcNMuePEbGOvNgNbqdMMRlzbocTikuCuQuISgQTWFtVSLUmAObgipXAnNEdUNXKVFBiNTIOornretCNOaEwhQTdIRlYaldWzFiummYKKJJcnDRJovDJTFXpQczJQBDnATyvopuBakmGKXTDsIhKfKNITJlsDkLTlKRKfObLvwpIgXvqmBmiWLKQlhqMyAcUoFxkFNPYeGFCduhGJTNtSMfvbGuupWzugWNrwwZKkwjfIqIdjXMAiVONPcMebzSCvUGtVblwohLzOhlnPKIQBTxpBYufIJesKHeZPUHiYaofkTEDcpRapVwluKFARevxkgjxuEFHgVEuQtAUFMMTszCgrqcuKFnJiZtmDBmYsatb';
 mypwdoffset:array[1..24] of shortint=(-1,-3,-6,-8,-7,-4,-5,-2,0,8,9,10,12,2,3,4,1,9,-9,3,-11,-12,10,-7);
 pi:extended=3.1415926;
@@ -165,6 +172,16 @@ function getmemsize(p:Pointer):natuint;
 procedure reallocmem(var p:Pointer;size:natuint);
 procedure move(const source;var dest;count:natuint);
 procedure sysheap_clear_all;
+function exe_heap_getmem(size:natuint):Pointer;
+function exe_heap_allocmem(size:natuint):Pointer;
+procedure exe_heap_freemem(var p:Pointer);
+function exe_heap_getmemsize(p:Pointer):natuint;
+procedure exe_heap_reallocmem(var p:Pointer;size:natuint);
+procedure exe_heap_move(var dest;const source;size:natuint);
+procedure exe_heap_clear_all;
+function frac(x:extended):extended;
+function optimize_integer_divide(a,b:natuint):natuint;
+function optimize_integer_modulo(a,b:natuint):natuint;
 function strlen(str:Pchar):natuint;
 function wstrlen(str:PWideChar):natuint;
 procedure strinit(var str:PChar;size:natuint);
@@ -175,6 +192,8 @@ procedure strset(var str:PChar;val:Pchar);
 procedure wstrset(var str:PWideChar;val:Pwidechar);
 function strcmp(str1,str2:Pchar):natint;
 function Wstrcmp(str1,str2:PwideChar):natint;
+function strcmpL(str1,str2:Pchar):natint;
+function WstrcmpL(str1,str2:PwideChar):natint;
 procedure strcat(var dest:PChar;src:PChar);
 procedure Wstrcat(var dest:PWideChar;src:PWideChar);
 procedure strfree(var str:PChar);
@@ -217,7 +236,6 @@ function ExtendedToPChar(num:Extended;Reserveddecimal:byte):PChar;
 function ExtendedToPWChar(num:Extended;Reserveddecimal:byte):PWideChar;
 function PCharToExtended(str:PChar):extended;
 function PWCharToExtended(str:PWideChar):extended;
-function DataToHex(Data:Pointer;Size:Natuint):PWideChar;
 function UIntPower(a,b:natuint):natuint;
 function ExtendedPower(a:extended;b:natuint):extended;
 function UintToHex(inputint:natuint):Pchar;
@@ -240,7 +258,10 @@ function Neighborlinegenerate(originalstr,linestr:PWideChar;row:natuint;mcolumn:
 function TotalLineList(originalstr,linefeed:PWideChar;mcolumn:natuint):linelist;
 
 var compheap,sysheap:systemheap;
+    exe_heap:executable_heap;
+    
 implementation
+
 procedure fpc_handleerror;compilerproc;[public,alias:'FPC_HANDLEERROR'];
 begin
 end;
@@ -513,6 +534,147 @@ procedure sysheap_clear_all;[public,alias:'sysheap_clear_all'];
 begin
  sysheap.heapcount:=0; sysheap.heaprest:=maxheap;
 end;
+procedure exe_heap_delete_item(p:Pointer);
+var index,i,j,size:natuint;
+    p1,p2:Pbyte;
+begin
+ index:=1;
+ while(index<=exe_heap.heap_count) do
+  begin
+   if(natuint(p)>=exe_heap.heap_section[index,1]) and
+   (natuint(p)<=exe_heap.heap_section[index,2]) then break;
+   inc(i,1);
+  end;
+ if(index>exe_heap.heap_count) then exit;
+ size:=exe_heap.heap_section[index,2]-exe_heap.heap_section[index,1]+1;
+ for i:=index+1 to exe_heap.heap_count do
+  begin
+   for j:=exe_heap.heap_section[i,1]-natuint(@exe_heap.heap_content)
+   to exe_heap.heap_section[i,2]-natuint(@exe_heap.heap_content) do
+    begin
+     p1:=(@exe_heap.heap_content+j-size-1); p2:=(@exe_heap.heap_content+j-1);
+     p1^:=p2^; p2^:=0;
+    end;
+   exe_heap.heap_section[i-1,1]:=exe_heap.heap_section[i,1]-size;
+   exe_heap.heap_section[i-1,2]:=exe_heap.heap_section[i,2]-size;
+  end;
+ inc(exe_heap.heap_rest_volume,size);
+ dec(exe_heap.heap_count);
+end;
+function exe_heap_getmem(size:natuint):Pointer;[public,alias:'exe_heap_getmem'];
+var i:natuint;
+    p:PByte;
+begin
+ if(exe_heap.heap_count>=exe_heap_section_max_volume) then exit(nil);
+ inc(exe_heap.heap_count);
+ if(exe_heap.heap_count>1) then
+  begin
+   exe_heap.heap_section[i,1]:=exe_heap.heap_section[i-1,2]+1;
+   exe_heap.heap_section[i,2]:=exe_heap.heap_section[i,1]+size;
+  end
+ else if(exe_heap.heap_count=1) then
+  begin
+   exe_heap.heap_section[i,1]:=natuint(@exe_heap.heap_content);
+   exe_heap.heap_section[i,2]:=exe_heap.heap_section[i,1]+size;
+  end;
+ for i:=exe_heap.heap_section[i,1]-natuint(@exe_heap.heap_section)
+ to exe_heap.heap_section[i,2]-natuint(@exe_heap.heap_section) do
+  begin
+   p:=(@exe_heap.heap_section+i-1); p^:=0;
+  end;
+ dec(exe_heap.heap_rest_volume,size);
+ exe_heap_getmem:=Pointer(@exe_heap.heap_section[i,1]);
+end;
+function exe_heap_allocmem(size:natuint):Pointer;[public,alias:'exe_heap_allocmem'];
+var i:natuint;
+    p:PByte;
+begin
+ if(exe_heap.heap_count>=exe_heap_section_max_volume) then exit(nil);
+ inc(exe_heap.heap_count);
+ if(exe_heap.heap_count>1) then
+  begin
+   exe_heap.heap_section[i,1]:=exe_heap.heap_section[i-1,2]+1;
+   exe_heap.heap_section[i,2]:=exe_heap.heap_section[i,1]+size-1;
+  end
+ else if(exe_heap.heap_count=1) then
+  begin
+   exe_heap.heap_section[i,1]:=natuint(@exe_heap.heap_content);
+   exe_heap.heap_section[i,2]:=exe_heap.heap_section[i,1]+size-1;
+  end;
+ for i:=exe_heap.heap_section[i,1]-natuint(@exe_heap.heap_section)
+ to exe_heap.heap_section[i,2]-natuint(@exe_heap.heap_section) do
+  begin
+   p:=(@exe_heap.heap_section+i-1); p^:=0;
+  end;
+ dec(exe_heap.heap_rest_volume,size);
+ exe_heap_allocmem:=Pointer(@exe_heap.heap_section[i,1]);
+end;
+procedure exe_heap_freemem(var p:Pointer);[public,alias:'exe_heap_freemem'];
+begin
+ if(p<>nil) then
+  begin
+   exe_heap_delete_item(p); p:=nil;
+  end;
+end;
+function exe_heap_getmemsize(p:Pointer):natuint;[public,alias:'exe_heap_getmemsize'];
+var index:natuint;
+begin
+ index:=1;
+ while(index<=exe_heap.heap_count) do
+  begin
+   if(natuint(p)>=exe_heap.heap_section[index,1]) and (natuint(p)<=exe_heap.heap_section[index,2])
+   then break;
+   inc(index);
+  end;
+ if(index>exe_heap.heap_count) then exit(0)
+ else exe_heap_getmemsize:=exe_heap.heap_section[index,2]-exe_heap.heap_section[index,1]+1;
+end;
+procedure exe_heap_reallocmem(var p:Pointer;size:natuint);[public,alias:'exe_heap_reallocmem'];
+var p1,p2:PByte;
+    i,index,orgsize,offset:natuint;
+begin
+ p2:=exe_heap_allocmem(size);
+ if(p2=nil) then exit;
+ index:=1;
+ while(index<=exe_heap.heap_count) do
+  begin
+   if(natuint(p)>=exe_heap.heap_section[index,1]) and (natuint(p)<=exe_heap.heap_section[index,2])
+   then break;
+   inc(index);
+  end;
+ orgsize:=exe_heap.heap_section[index,2]-exe_heap.heap_section[index,1]+1;
+ p1:=Pointer(exe_heap.heap_section[index,1]); offset:=natuint(p)-natuint(p1);
+ if(size>orgsize) then
+  begin
+   for i:=1 to orgsize do
+    begin
+     (p2+i-1)^:=(p1+i-1)^;
+    end;
+  end
+ else if(size<=orgsize) then
+  begin
+   for i:=1 to size do
+    begin
+     (p2+i-1)^:=(p1+i-1)^;
+    end;
+  end;
+ exe_heap_freemem(p1);
+ p:=p2-orgsize+offset;
+end;
+procedure exe_heap_move(var dest;const source;size:natuint);[public,alias:'exe_heap_move'];
+var p1,p2:Pbyte;
+    i:natuint;
+begin
+ p1:=@source; p2:=@dest;
+ for i:=1 to size do
+  begin
+   (p2+i-1)^:=(p1+i-1)^;
+  end;
+end;   
+procedure exe_heap_clear_all;[public,alias:'exe_heap_clear_all'];
+begin
+ exe_heap.heap_count:=0; exe_heap.heap_rest_volume:=exe_heap_content_max_volume;
+end;
 function frac(x:extended):extended;[public,alias:'frac'];
 var j:natuint;
     num,procnum:extended;
@@ -536,6 +698,24 @@ begin
    if(procnum>1) then procnum:=procnum/10;
   end;
  frac:=num;
+end;
+function optimize_integer_divide(a,b:natuint):natuint;[public,alias:'optimize_integer_devide'];
+var res,procnum:natuint;
+begin
+ res:=0; procnum:=a;
+ while(procnum>0) do
+  begin
+   if(procnum>=b) then procnum:=procnum-b else break;
+   inc(res,1);
+  end;
+ optimize_integer_divide:=res;
+end;
+function optimize_integer_modulo(a,b:natuint):natuint;[public,alias:'optimize_integer_modulo'];
+var res:natuint;
+begin
+ res:=a;
+ while(res>=b) do dec(res,b);
+ optimize_integer_modulo:=res;
 end;
 function strlen(str:Pchar):natuint;[public,alias:'strlen'];
 var res:natuint;
@@ -572,6 +752,28 @@ begin
  if((str1+i)^>(str2+i)^) then Wstrcmp:=1
  else if((str1+i)^<(str2+i)^) then Wstrcmp:=-1
  else Wstrcmp:=0;
+end;
+function strcmpL(str1,str2:Pchar):natint;[public,alias:'strcmpL'];
+var i,len1,len2:natint;
+begin
+ i:=0; len1:=strlen(str1); len2:=strlen(str2);
+ if(len1>len2) then exit(1) else if(len1<len2) then exit(-1);
+ if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
+ while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
+ if((str1+i)^>(str2+i)^) then strcmpL:=1
+ else if((str1+i)^<(str2+i)^) then strcmpL:=-1
+ else strcmpL:=0;
+end;
+function WstrcmpL(str1,str2:PwideChar):natint;[public,alias:'WstrcmpL'];
+var i,len1,len2:natint;
+begin
+ i:=0; len1:=Wstrlen(str1); len2:=Wstrlen(str2);
+ if(len1>len2) then exit(1) else if(len1<len2) then exit(-1);
+ if(str1=nil) then exit(-1) else if(str2=nil) then exit(1);
+ while((str1+i)^=(str2+i)^) and ((str1+i)^<>#0) and ((str2+i)^<>#0) do inc(i);
+ if((str1+i)^>(str2+i)^) then WstrcmpL:=1
+ else if((str1+i)^<(str2+i)^) then WstrcmpL:=-1
+ else WstrcmpL:=0;
 end;
 procedure strinit(var str:PChar;size:natuint);[public,alias:'strinit'];
 begin
@@ -677,28 +879,54 @@ begin
 end;  
 function strcopy(str:PChar;index,count:Natuint):Pchar;[public,alias:'strcopy'];
 var newstr:PChar;
-    i:natuint;
+    i,len:natuint;
 begin
- if(index+count-1>strlen(str)) then exit(nil);
- strinit(newstr,count);
- for i:=1 to count do
+ len:=strlen(str);
+ if(index>len) then exit(nil);
+ if(index+count-1>len) then
   begin
-   (newstr+i-1)^:=(str+index-1+i-1)^;
+   strinit(newstr,len-index+1);
+   for i:=1 to len-index+1 do
+    begin
+     (newstr+i-1)^:=(str+index-1+i-1)^;
+    end;
+   (newstr+len-index)^:=#0;
+  end
+ else
+  begin
+   strinit(newstr,count);
+   for i:=1 to count do
+    begin
+     (newstr+i-1)^:=(str+index-1+i-1)^;
+    end;
+   (newstr+count)^:=#0;
   end;
- (newstr+count)^:=#0;
  strcopy:=newstr;
 end;
 function Wstrcopy(str:PWideChar;index,count:Natuint):PWideChar;[public,alias:'Wstrcopy'];
 var newstr:PWideChar;
-    i:natuint;
+    i,len:natuint;
 begin
- if(index+count-1>Wstrlen(str)) then exit(nil);
- Wstrinit(newstr,count);
- for i:=1 to count do
+ len:=Wstrlen(str);
+ if(index>len) then exit(nil);
+ if(index+count-1>len) then
   begin
-   (newstr+i-1)^:=(str+index-1+i-1)^;
+   Wstrinit(newstr,len-index+1);
+   for i:=1 to len-index+1 do
+    begin
+     (newstr+i-1)^:=(str+index-1+i-1)^;
+    end;
+   (newstr+len-index)^:=#0;
+  end
+ else
+  begin
+   Wstrinit(newstr,count);
+   for i:=1 to count do
+    begin
+     (newstr+i-1)^:=(str+index-1+i-1)^;
+    end;
+   (newstr+count)^:=#0;
   end;
- (newstr+count)^:=#0;
  Wstrcopy:=newstr;
 end;
 function strcutout(str:PChar;left,right:Natuint):PChar;[public,alias:'strcutout'];
@@ -706,13 +934,25 @@ var newstr:Pchar;
     i,len:natuint;
 begin
  len:=strlen(str); 
- if(left>len) or (right>len) or (left>right) then exit(nil);
- strinit(newstr,right-left+1);
- for i:=left to right do
+ if(left>len) or (left>right) then exit(nil);
+ if(right<=len) then
   begin
-   (newstr+i-left)^:=(str+i-1)^;
+   strinit(newstr,right-left+1);
+   for i:=left to right do
+    begin
+     (newstr+i-left)^:=(str+i-1)^;
+    end;
+   (newstr+right-left+1)^:=#0;
+  end
+ else if(right>len) then
+  begin
+   strinit(newstr,len-left+1);
+   for i:=left to len do
+    begin
+     (newstr+i-1)^:=(str+i-1)^;
+    end;
+   (newstr+len-left+1)^:=#0;
   end;
- (newstr+right-left+1)^:=#0;
  strcutout:=newstr;
 end;
 function Wstrcutout(str:PWideChar;left,right:Natuint):PWideChar;[public,alias:'Wstrcutout'];
@@ -720,13 +960,25 @@ var newstr:PWidechar;
     i,len:natuint;
 begin
  len:=Wstrlen(str); 
- if(left>len) or (right>len) or (left>right) then exit(nil);
- Wstrinit(newstr,right-left+1);
- for i:=left to right do
+ if(left>len) or (left>right) then exit(nil);
+ if(right<=len) then
   begin
-   (newstr+i-left)^:=(str+i-1)^;
+   Wstrinit(newstr,right-left+1);
+   for i:=left to right do
+    begin
+     (newstr+i-left)^:=(str+i-1)^;
+    end;
+   (newstr+right-left+1)^:=#0;
+  end
+ else if(right>len) then
+  begin
+   Wstrinit(newstr,len-left+1);
+   for i:=left to len do
+    begin
+     (newstr+i-1)^:=(str+i-1)^;
+    end;
+   (newstr+len-left+1)^:=#0;
   end;
- (newstr+right-left+1)^:=#0;
  Wstrcutout:=newstr;
 end;
 procedure strdelete(var str:PChar;index,count:Natuint);[public,alias:'strdelete'];
@@ -1535,22 +1787,6 @@ begin
    PWCharToExtended:=intpart+decpart/ExtendedPower(10,len-position);
   end;
 end; 
-function DataToHex(Data:Pointer;Size:Natuint):PWideChar;[public,alias:'DataToHex'];
-const hexcode:PWideChar='0123456789ABCDEF';
-var highbit,lowbit:byte;
-    i:natuint;
-    mystr:PWideChar;
-begin
- mystr:=allocmem((Size*2+1)*Sizeof(WideChar));
- for i:=1 to Size do
-  begin
-   highbit:=Byte((Data+i-1)^) div 16;
-   lowbit:=Byte((Data+i-1)^) mod 16;
-   (mystr+i*2-2)^:=(hexcode+highbit)^;
-   (mystr+i*2-1)^:=(hexcode+lowbit)^;
-  end;
- DataToHex:=mystr;
-end;
 function UIntPower(a,b:natuint):natuint;[public,alias:'UintPower'];
 var res,i:natuint;
 begin
@@ -1574,11 +1810,15 @@ begin
 end;
 function UintToHex(inputint:natuint):Pchar;[public,alias:'UintToHex'];
 const hexcode:PChar='0123456789ABCDEF';
-var i,j,k,procint:natuint;
+var i,j,k,procint,procnum:natuint;
     str:PChar;
 begin
- i:=0; procint:=inputint;
- while(inputint div UintPower(16,i)>=16) do inc(i);
+ i:=0; procint:=inputint; procnum:=1;
+ while(optimize_integer_divide(procint,procnum)>=16) do 
+  begin
+   procnum:=procnum*16;
+   inc(i);
+  end;
  strinit(str,i+1);
  for j:=i+1 downto 1 do
   begin 
@@ -1590,11 +1830,15 @@ begin
 end;
 function UintToWhex(inputint:natuint):PWideChar;[public,alias:'UintToWHex'];
 const hexcode:PWideChar='0123456789ABCDEF';
-var i,j,k,procint:natuint;
+var i,j,k,procint,procnum:natuint;
     str:PWideChar;
 begin
- i:=0; procint:=inputint;
- while(inputint div UintPower(16,i)>=16) do inc(i);
+ i:=0; procint:=inputint; procnum:=1;
+ while(optimize_integer_divide(procint,procnum)>=16) do 
+  begin
+   procnum:=procnum*16;
+   inc(i);
+  end;
  Wstrinit(str,i+1);
  for j:=i+1 downto 1 do
   begin 
@@ -2118,4 +2362,5 @@ end;
 begin
  compheap.heapcount:=0; compheap.heaprest:=maxheap;
  sysheap.heapcount:=0; sysheap.heaprest:=maxheap;
+ exe_heap.heap_count:=0; exe_heap.heap_rest_volume:=exe_heap_content_max_volume*sizeof(word);
 end.

@@ -3,7 +3,6 @@ unit uefi;
 {$MODE FPC}
 
 interface
-
 const efi_usb_max_bulk_buffer_num=10;
       efi_usb_max_iso_buffer_num=7;
       efi_usb_max_iso_buffer_num1=2;
@@ -788,7 +787,7 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                           end;
      Pefi_file_system_info=^efi_file_system_info;
      efi_file_system_volume_label=record
-                                  VolumeLabel:array[1..1024] of WideChar;
+                                  VolumeLabel:array[1..256] of WideChar;
                                   end;
      Pefi_tape_io_protocol=^efi_tape_io_protocol;
      efi_tape_read=function (This:Pefi_tape_io_protocol;var BufferSize:natuint;var Buffer):efi_status;cdecl;
@@ -1973,9 +1972,95 @@ efidriverdiagnostictypeCancel=3,efiDriverDiagnosticTypeMaximum);
                      VerifyBootObject:efi_bis_verify_boot_object;
                      VerifyObjectWithCredential:efi_bis_verify_object_with_credential;
                      end;
-    {efi_http_boot_callback_protocol=record
+    Pefi_http_boot_callback_protocol=^efi_http_boot_callback_protocol;
+    efi_http_callback_datatype=(HttpBootDhcp4,HttpBootDhcp6,HttpBootHttpRequest,HttpBootHttpResponse,HttpBootHttpEntityBody,HttpBootTypeMax);
+    efi_http_boot_callback=function (This:Pefi_http_boot_callback_protocol;DataType:efi_http_callback_datatype;Received:boolean;DataLength:dword;Data:Pointer):efi_status;cdecl;
+    efi_http_boot_callback_protocol=record
                                     CallBack:efi_http_boot_callback;
-                                    end;}
+                                    end;
+    Pefi_managed_network_protocol=^efi_managed_network_protocol;
+    efi_managed_network_config_data=record
+                                    ReceivedQueueTimeoutValue:dword;
+                                    TransmitQueueTimeoutValue:dword;
+                                    ProtocolTypeFilter:word;
+                                    EnableUniCastReceive:boolean;
+                                    EnableMultiCastReceive:boolean;
+                                    EnableBroadCastReceive:boolean;
+                                    EnablePromiscuousReceive:boolean;
+                                    FlushQueuesOnReset:boolean;
+                                    EnableReceiveTimeStamps:boolean;
+                                    DisableBackgroundPolling:boolean;
+                                    end;
+    Pefi_managed_network_config_data=^efi_managed_network_config_data;
+    efi_managed_network_get_mode_data=function (This:Pefi_managed_network_protocol;var MnpConfigData:efi_managed_network_config_data;var SnpModeData:efi_simple_network_mode):efi_status;cdecl;
+    efi_managed_network_configure=function (This:Pefi_managed_network_protocol;MnpConfigData:Pefi_managed_network_config_data):efi_status;cdecl;
+    efi_managed_network_mcast_ip_to_mac=function (This:Pefi_managed_network_protocol;Ipv6Flag:boolean;IpAddress:Pefi_ip_address;var MacAddress:efi_mac_address):efi_status;cdecl;
+    efi_managed_network_groups=function (This:Pefi_managed_network_protocol;JoinFlag:boolean;MacAddress:Pefi_mac_address):efi_status;cdecl;
+    efi_managed_network_receive_data=record 
+                                     TimeStamp:efi_time;
+                                     RecycleEvent:efi_event;
+                                     PacketLength:dword;
+                                     HeaderLength:dword;
+                                     AddressLength:dword;
+                                     dataLength:dword;
+                                     RoadCastFlag:boolean;
+                                     MultiCastFlag:boolean;
+                                     PromiscuousFlag:boolean;
+                                     Protocol:word;
+                                     DestinationAddress:Pointer;
+                                     SourceAddress:Pointer;
+                                     MediaHeader:Pointer;
+                                     PacketData:Pointer;
+                                     end;
+    efi_managed_network_fragment_data=record
+                                      FragmentLength:dword;
+                                      FragmentBuffer:Pointer;
+                                      end;
+    efi_managed_network_transmit_data=record
+                                      DestinationAddress:Pefi_mac_address;
+                                      SourceAddress:Pefi_mac_address;
+                                      ProtocolType:word;
+                                      DataLength:dword;
+                                      HeaderLength:word;
+                                      FragmentCount:word;
+                                      FragmentTable:array[1..1] of efi_managed_network_fragment_data;
+                                      end;
+    efi_managed_network_completion_token=record
+                                         Event:efi_event;
+                                         Status:efi_status;
+                                         case boolean of
+                                         True:(RxData:efi_managed_network_receive_data;);
+                                         False:(TxData:efi_managed_network_transmit_data;);
+                                         end;
+    Pefi_managed_network_completion_token=^efi_managed_network_completion_token;
+    efi_managed_network_transmit=function (This:Pefi_managed_network_protocol;Token:Pefi_managed_network_completion_token):efi_status;cdecl;
+    efi_managed_network_receive=function (This:Pefi_managed_network_protocol;Token:Pefi_managed_network_completion_token):efi_status;cdecl;
+    efi_managed_network_cancel=function (This:Pefi_managed_network_protocol;Token:Pefi_managed_network_completion_token):efi_status;cdecl;
+    efi_managed_network_poll=function (This:Pefi_managed_network_protocol):efi_status;cdecl;
+    efi_managed_network_protocol=record
+                                 GetModeData:efi_managed_network_get_mode_data;
+                                 Configure:efi_managed_network_configure;
+                                 MCastIpToMac:efi_managed_network_mcast_ip_to_mac;
+                                 Groups:efi_managed_network_groups;
+                                 Transmit:efi_managed_network_transmit;
+                                 Receive:efi_managed_network_receive;
+                                 Cancel:efi_managed_network_cancel;
+                                 Poll:efi_managed_network_poll;
+                                 end;
+    {Pefi_bluetooth_hc_protocol=^efi_bluetooth_hc_protocol;
+    efi_bluetooth_hc_send_command=function (This:Pefi_bluetooth_hc_protocol;var BufferSize:natuint;Buffer:Pointer;Timeout:natuint):efi_status;cdecl;
+    efi_bluetooth_hc_receive_event=function (This:Pefi_bluetooth_hc_protocol;var BufferSize:natuint;var Buffer;Timeout:natuint):efi_status;cdecl;
+    efi_bluetooth_hc_protocol=record
+                              SendCommand:efi_bluetooth_hc_send_command;
+                              ReceiveEvent:efi_bluetooth_hc_receive_event;
+                              AsyncReceiveEvent:efi_bluetooth_hc_async_receive_event;
+                              SendACLData:efi_bluetooth_hc_send_acl_data;
+                              ReceiveACLData:efi_bluetooth_hc_receive_acl_data;
+                              AsyncReceiveACLData:efi_bluetooth_hc_async_receive_acl_data;
+                              SendSCOData:efi_bluetooth_hc_send_sco_data;
+                              ReceiveSCOData:efi_bluetooth_hc_receive_sco_data;
+                              AsyncReceiveSCOData:efi_bluetooth_hc_async_receive_sco_data;
+                              end;}
 {User Defined Types}
     efi_file_system_list=record
                          file_system_content:^Pefi_simple_file_system_protocol;
@@ -2089,6 +2174,7 @@ const unused_entry_guid:efi_guid=(data1:$00000000;data2:$0000;data3:$0000;data4:
       efi_http_boot_callback_protocol_guid:efi_guid=(data1:$BA23B311;data2:$343D;data3:$11E6;data4:($91,$85,$58,$20,$B1,$D6,$52,$99));
       efi_managed_network_service_binding_protocol_guid:efi_guid=(data1:$F36FF770;data2:$A7E1;data3:$42CF;data4:($9E,$D2,$56,$F0,$F2,$71,$F4,$4C));
       efi_managed_network_protocol_guid:efi_guid=(data1:$7AB33A91;data2:$ACE5;data3:$4326;data4:($B5,$72,$E7,$EE,$33,$D3,$9F,$16));
+      efi_bluetooth_hc_protocol_guid:efi_guid=(data1:$B3930571;data2:$BEBA;data3:$4FC5;data4:($92,$03,$94,$27,$24,$2E,$6A,$43));
       efi_success=0;
       efi_load_error=1;
       efi_invaild_parameter=2;
@@ -2615,6 +2701,7 @@ procedure efi_system_restart_information_off(systemtable:Pefi_system_table;var m
 function efi_disk_empty_list(systemTable:Pefi_system_table):efi_disk_list;
 function efi_disk_tydq_get_fs_list(systemTable:Pefi_system_table):efi_disk_list;
 procedure efi_disk_tydq_set_fs(edl:efi_disk_list;diskindex:natuint);
+procedure efi_disk_system_install_from_cdrom(systemtable:Pefi_system_table;diskindex:natuint;cdromindex:natuint);
 
 var maxcolumn:Natuint=80;
     maxrow:Natuint=25;
@@ -3045,7 +3132,7 @@ begin
   end;
 end;
 function efi_console_edit_text_total_line(outputstr,linefeed:PWideChar;mcolumn:natuint):natuint;[public,alias:'EFI_CONSOLE_EDIT_TEXT_TOTAL_LINE'];
-var pos1,pos2,pos3,mylen1,mylen2,res:natuint;
+var pos1,pos2,pos3,mylen1,mylen2,res,i,procnum:natuint;
 begin
  pos1:=1; pos2:=2; res:=0; mylen1:=Wstrlen(outputstr); mylen2:=Wstrlen(linefeed);
  while(pos2>0) do
@@ -3054,7 +3141,17 @@ begin
    if(pos2=0) then pos3:=mylen1+1 else pos3:=pos2;
    if(pos3-pos1>mcolumn) then
     begin
-     res:=res+(pos3-pos1) div mcolumn+1;
+     procnum:=pos3-pos1; i:=1;
+     while(procnum>0) do
+      begin
+       if(procnum>=mcolumn) then procnum:=procnum-mcolumn 
+       else 
+        begin
+         procnum:=0; break;
+        end;
+       inc(i,1);
+      end;
+     res:=res+i;
     end
    else
     begin
@@ -3362,7 +3459,7 @@ begin
   end;
 end;
 procedure efi_console_edit_hex_output_string(systemtable:Pefi_system_table;ReadData:PByte;ReadLength:natuint;filename:PWideChar;startline:natuint;ccolumn,crow:natuint);[public,alias:'EFI_CONSOLE_EDIT_HEX_OUTPUT_STRING'];
-var startpos,endpos,i,len:natuint;
+var startpos,endpos,i,len,pnum1,pnum2:natuint;
     partstr:PwideChar;
 begin
  SystemTable^.ConOut^.ClearScreen(SystemTable^.ConOut);
@@ -3377,7 +3474,7 @@ begin
  SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,UintToPWChar(crow));
  Wstrfree(partstr);
  SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,'/');
- partstr:=UintToPWChar(ReadLength div (maxcolumn div 3)+1);
+ partstr:=UintToPWChar(optimize_integer_divide(Readlength,maxcolumn div 3)+1);
  SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,partstr);
  Wstrfree(partstr);
  SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,' (');
@@ -3409,7 +3506,7 @@ begin
     end;
    Wstrfree(partstr);
    inc(i);
-   if(i mod (maxcolumn div 3)=1) and (i<=endpos) then SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
+   if(optimize_integer_modulo(i,maxcolumn div 3)=1) and (i<=endpos) then SystemTable^.ConOut^.OutputString(SystemTable^.ConOut,#13#10);
   end;
 end;
 procedure efi_console_edit_hex_content_string(systemtable:Pefi_system_table;var ReadData:PByte;var ReadLength:natuint;filename:PWideChar);[public,alias:'EFI_CONSOLE_EDIT_HEX_CONTENT_STRING'];
@@ -3449,10 +3546,10 @@ begin
    SystemTable^.BootServices^.WaitForEvent(1,@SystemTable^.ConIn^.WaitForKey,waitidx);
    SystemTable^.ConIn^.ReadKeyStroke(SystemTable^.ConIn,key);
    inputch:=key.UnicodeChar; sc:=key.ScanCode;
-   if(sc=2) and (apos1<(ReadLength+1) div maxbyte*maxbyte) then
+   if(sc=2) and (apos1<optimize_integer_divide(ReadLength+1,maxbyte)*maxbyte) then
     begin
-     procnum:=(ReadLength+1) div maxbyte+1;
-     if(apos1>=(procnum-1)*maxbyte+1) and (apos1<=procnum*maxbyte) then inc(apos1,ReadLength mod maxbyte)
+     procnum:=optimize_integer_divide(ReadLength+1,maxbyte)+1;
+     if(apos1>=(procnum-1)*maxbyte+1) and (apos1<=procnum*maxbyte) then inc(apos1,optimize_integer_modulo(ReadLength,maxbyte))
      else inc(apos1,maxbyte);
     end
    else if(sc=1) and (apos1>maxbyte) then
@@ -3484,7 +3581,7 @@ begin
     end
    else if(sc=10) then
     begin
-     procnum:=(ReadLength+1) div maxpagebyte+1;
+     procnum:=optimize_integer_divide(ReadLength+1,maxpagebyte)+1;
      if(apos1<(procnum-1)*maxpagebyte) then
       begin
        inc(apos1,maxpagebyte);
@@ -3534,13 +3631,18 @@ begin
        ReallocMem(ReadData,sizeof(byte)*(ReadLength+1));
       end;
     end;
-   procnum:=(Readlength+1) div maxbyte+1; arow:=apos1 div maxbyte+1; acolumn:=(apos1-1) mod maxbyte*3+apos2;
+   procnum:=optimize_integer_divide(Readlength+1,maxbyte)+1; 
+   arow:=optimize_integer_divide(apos1,maxbyte)+1; 
+   acolumn:=optimize_integer_modulo(apos1-1,maxbyte)*3+apos2;
    if(arow>(maxrow-2) div 2) and (arow<procnum-(maxrow-2) div 2) then 
-   efi_console_edit_hex_output_string(systemtable,ReadData,ReadLength,filename,arow-(maxrow-2) div 2,(apos1-1) mod maxbyte*2+apos2,arow)
+   efi_console_edit_hex_output_string(systemtable,ReadData,ReadLength,filename,arow-(maxrow-2) div 2,
+   optimize_integer_modulo(apos1-1,maxbyte)*2+apos2,arow)
    else if(arow<=(maxrow-2) div 2) then 
-   efi_console_edit_hex_output_string(systemtable,ReadData,ReadLength,filename,1,(apos1-1) mod maxbyte*2+apos2,arow)
+   efi_console_edit_hex_output_string(systemtable,ReadData,ReadLength,filename,1,
+   optimize_integer_modulo(apos1-1,maxbyte)*2+apos2,arow)
    else if(arow>=procnum-(maxrow-2) div 2) then 
-   efi_console_edit_hex_output_string(systemtable,ReadData,ReadLength,filename,procnum-(maxrow-2) div 2,(apos1-1) mod maxbyte*2+apos2,arow);
+   efi_console_edit_hex_output_string(systemtable,ReadData,ReadLength,filename,procnum-(maxrow-2) div 2,
+   optimize_integer_modulo(apos1-1,maxbyte)*2+apos2,arow);
    currentcolumn:=acolumn-1; 
    if(arow>(maxrow-2) div 2) and (arow<procnum-(maxrow-2) div 2) then currentrow:=2+(maxrow-2) div 2
    else if(arow<=(maxrow-2) div 2) then currentrow:=1+arow
@@ -3637,7 +3739,7 @@ begin
  mseed1:=seed1 div 4294967296;
  mseed2:=seed1 mod 4294967296 div 65536;
  mseed3:=seed1 mod 4294967296 mod 65536;
- for i:=1 to 8 do mseed4[i]:=seed2 div UintPower(2,(8-i)*8) mod UintPower(2,(i-1)*8);
+ for i:=1 to 8 do mseed4[i]:=optimize_integer_modulo(optimize_integer_divide(seed2,UintPower(2,(8-i)*8)),UintPower(2,(i-1)*8));
  resguid.data1:=mseed1 div 13*5+12;
  resguid.data2:=mseed2 div 7*3+17;
  resguid.data3:=mseed3 div 3*2+21;
@@ -3823,8 +3925,8 @@ begin
    gpt.reserved1:=0;
    gpt.MyLBA:=1; 
    gpt.AlternateLBA:=lastblock;
-   gpt.FirstUsableLBA:=2+128 div (blocksize div 128); 
-   gpt.LastUsableLBA:=gpt.AlternateLBA-128 div (blocksize div 128)-1;
+   gpt.FirstUsableLBA:=2+optimize_integer_divide(128,blocksize div 128); 
+   gpt.LastUsableLBA:=gpt.AlternateLBA-optimize_integer_divide(128,blocksize div 128)-1;
    gpt.DiskGuid:=efi_generate_guid($F1B2A2C3D7E3F967+32768*i,$C1F2E3D1F4C9E84F+8192*i);
    gpt.PartitionEntryLBA:=2;
    gpt.NumberOfPartitionEntries:=128;
@@ -3841,7 +3943,7 @@ begin
          epe.epe_content[j].PartitionTypeGUID:=efi_system_partition_guid;
          epe.epe_content[j].UniquePartitionGUID:=efi_generate_guid($F1B2A2C3D7E3F967+4096*i+j*21,$C1F2E3D1F4C9E84F+3072*i+j*17);
          epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA;
-         epe.epe_content[j].EndingLBA:=gpt.FirstUsableLBA+256*1024 div (blocksize div 512)-1;
+         epe.epe_content[j].EndingLBA:=gpt.FirstUsableLBA+256*optimize_integer_divide(1024,blocksize div 512)-1;
          epe.epe_content[j].Attributes:=0;
          epe.epe_content[j].PartitionName[1]:='E';
          epe.epe_content[j].PartitionName[2]:='F';
@@ -3852,7 +3954,7 @@ begin
         begin
          epe.epe_content[j].PartitionTypeGUID:=efi_generate_guid($F1B2A2C3D7E3F967+4096*i+j*23,$C1F2E3D1F4C9E84F+4096*i+j*19);
          epe.epe_content[j].UniquePartitionGUID:=efi_generate_guid($F1B2A2C3D7E3F967+4096*i+j*21,$C1F2E3D1F4C9E84F+4096*i+j*17);
-         epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA+256*1024 div (blocksize div 512);
+         epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA+256*optimize_integer_divide(1024,blocksize div 512);
          epe.epe_content[j].EndingLBA:=gpt.LastUsableLBA;
          epe.epe_content[j].Attributes:=0;
          epe.epe_content[j].PartitionName[1]:='T';
@@ -3909,7 +4011,7 @@ begin
    diop^.WriteDisk(diop,mediaid,blocksize*lastblock,blocksize,@gpt);
    diskwritepos:=blocksize*2;
    diop^.WriteDisk(diop,mediaid,diskwritepos,sizeof(epe.epe_content),@epe.epe_content);
-   diop^.WriteDisk(diop,mediaid,blocksize*lastblock-blocksize*(128 div (blocksize div 128)),sizeof(epe.epe_content),@epe.epe_content);
+   diop^.WriteDisk(diop,mediaid,blocksize*lastblock-blocksize*optimize_integer_divide(128,blocksize shr 7),sizeof(epe.epe_content),@epe.epe_content);
    if(i=harddiskindex) then
     begin
      fat32h.JumpOrder[1]:=$EB; fat32h.JumpOrder[2]:=$58; fat32h.JumpOrder[3]:=$90;
@@ -3926,8 +4028,8 @@ begin
      fat32h.SectorPerTrack:=32; 
      fat32h.NumHeads:=8;
      fat32h.HiddenSectors:=0; 
-     fat32h.TotalSectors32:=1024*256 div (blocksize div 512); 
-     fat32h.FATSector32:=256 div (blocksize div 512);
+     fat32h.TotalSectors32:=1024*optimize_integer_divide(256,blocksize shr 9); 
+     fat32h.FATSector32:=optimize_integer_divide(256,blocksize shr 9);
      fat32h.ExtendedFlags:=0; 
      fat32h.filesystemVersion:=0; 
      fat32h.RootCluster:=fat32h.ReservedSectorCount+fat32h.FATSector32*2;
@@ -3950,7 +4052,7 @@ begin
      fat32fs.FSI_leadsig:=$41615252; 
      for j:=1 to 480 do fat32fs.FSI_Reserved1[j]:=0;
      fat32fs.FSI_StrucSig:=$61417272;
-     fat32fs.FSI_FreeCount:=1024*256 div (blocksize shr 9)-fat32h.ReservedSectorCount-fat32h.FATSector32*2; 
+     fat32fs.FSI_FreeCount:=1024*optimize_integer_divide(256,blocksize shr 9)-fat32h.ReservedSectorCount-fat32h.FATSector32*2; 
      fat32fs.FSI_NextFree:=fat32h.ReservedSectorCount+fat32h.FATSector32*2;
      for j:=1 to 12 do fat32fs.FSI_Reserved2[j]:=0;
      fat32fs.FSI_TrailSig:=$AA550000;
@@ -3959,7 +4061,7 @@ begin
      diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+blocksize,blocksize,@fat32fs);
      diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+blocksize*6,blocksize,@fat32h);
      diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+blocksize*7,blocksize,@fat32fs);
-     diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+1024*256*blocksize div (blocksize div 512),sizeof(efi_guid),@system_restart_guid);
+     diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+1024*256*optimize_integer_divide(blocksize,blocksize shr 9),sizeof(efi_guid),@system_restart_guid);
     end;
   end;
 end;
@@ -4094,6 +4196,66 @@ begin
  dp:=(edl.disk_content+diskindex-1)^; bp:=(edl.disk_block_content+diskindex-1)^;
  signature:=$5D47291AD7E3F2B1;
  dp^.WriteDisk(dp,bp^.Media^.MediaId,0,8,@signature);
+end;
+procedure efi_disk_system_install_from_cdrom(systemtable:Pefi_system_table;diskindex:natuint;cdromindex:natuint);[public,alias:'EFI_SYSTEM_INSTALL_FROM_CDROM'];
+const orgstr:array[0..4] of PWideChar=('\EFI\SETUP\Sysmainx64.efi','\EFI\SETUP\Sysmainaa64.efi','\EFI\SETUP\Sysmainloongarch64.efi','\EFI\SETUP\Sysmainriscv64.efi','\EFI\SETUP\Sysmainriscv128.efi');
+      deststrbare:array[0..4] of PWideChar=('\EFI\BOOT\bootx64.efi','\EFI\BOOT\bootaa64.efi','\EFI\BOOT\bootloongarch64.efi','\EFI\BOOT\bootriscv64.efi','\EFI\BOOT\bootriscv128.efi');
+      deststrmulti:array[0..4] of PWideChar=('\EFI\TYDQOS\bootx64.efi','\EFI\TYDQOS\bootaa64.efi','\EFI\TYDQOS\bootloongarch64.efi','\EFI\TYDQOS\bootriscv64.efi','\EFI\TYDQOS\bootriscv128.efi');
+var efsle:efi_file_system_list_ext;
+    fs1,fs2:Pefi_simple_file_system_protocol;
+    f1,f2:Pefi_file_protocol;
+    status1,status2:efi_status;
+    size:natuint;
+    fileinfo:efi_file_info;
+    index:byte;
+begin
+ efsle:=efi_list_all_file_system_ext(systemtable);
+ if(diskindex>efsle.fsrwcount) then
+  begin
+   freemem(efsle.fsrwcontent); freemem(efsle.fsrcontent); exit;
+  end;
+ if(cdromindex>efsle.fsrcount) then
+  begin
+   freemem(efsle.fsrwcontent); freemem(efsle.fsrcontent); exit;
+  end;
+ fs1:=(efsle.fsrwcontent+diskindex-1)^; fs2:=(efsle.fsrcontent+cdromindex-1)^;
+ fs1^.OpenVolume(fs1,f1); fs2^.OpenVolume(fs2,f2);
+ index:=efi_get_platform;
+ status1:=f2^.Open(f2,f2,orgstr[index],efi_file_mode_read,efi_file_system);
+ f2^.GetInfo(f2,@efi_file_info_id,size,fileinfo);
+ size:=fileinfo.filesize;
+ if(status1=0) then 
+  begin
+   f2^.SetPosition(f2,0);
+   f2^.efiRead(f2,size,content);
+  end
+ else if(status1<>0) then
+  begin
+   f1^.Close(f1); f2^.Close(f2);
+   freemem(efsle.fsrwcontent); freemem(efsle.fsrcontent); exit;
+  end;
+ status2:=f1^.Open(f1,f1,deststrmulti[index],efi_file_mode_read or efi_file_mode_write or efi_file_mode_create,efi_file_system);
+ if(status2=0) then
+  begin
+   f1^.SetPosition(f1,0);
+   f1^.efiWrite(f1,size,@content);
+  end
+ else
+  begin
+   status2:=f1^.Open(f1,f1,deststrbare[index],efi_file_mode_read or efi_file_mode_write or efi_file_mode_create,efi_file_system);
+   if(status2<>0) then 
+    begin
+     f1^.Close(f1); f2^.Close(f2);
+     freemem(efsle.fsrwcontent); freemem(efsle.fsrcontent); exit;
+    end
+   else
+    begin
+     f1^.SetPosition(f1,0);
+     f1^.efiWrite(f1,size,@content);
+    end;
+  end;
+ f1^.Close(f1); f2^.Close(f2);
+ freemem(efsle.fsrwcontent); freemem(efsle.fsrcontent); 
 end;
 
 end.

@@ -25,6 +25,6 @@
 	rm -rf *.o
 	rm -rf installer
 	rm -rf kernel
-	#rm -rf *.dll
+	rm -rf *.dll
 	rm -rf *.s
         rm -rf *.res

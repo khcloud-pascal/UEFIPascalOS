@@ -17,8 +17,17 @@ var mystr,mystr2,mystr3,mystr4,writestr,partstr:PWideChar;
     tfsd:tydqfs_data;
     fsi:tydqfs_system_info;
     fsiindex:natuint;
+    myfilesystemsize:extended;
+    {Only for autodetectkernel}
+    efsle:efi_file_system_list_ext;
+    fs1,fs2:Pefi_simple_file_system_protocol;
+    f1,f2:Pefi_file_protocol;
+    fi1,fi2:efi_file_system_info;
+    pnum1,pnum2:natuint;
+    size:natuint;
+    {Ended autodetectkernel}
 begin
- ParentImageHandle:=ImageHandle;
+ ParentImageHandle:=ImageHandle; GlobalSystemTable:=SystemTable;
  efi_console_set_global_colour(Systemtable,efi_bck_black,efi_lightgrey);
  efi_console_clear_screen(systemtable);
  efi_console_get_max_row_and_max_column(systemtable,true);
@@ -386,6 +395,96 @@ begin
  efi_console_output_string(systemtable,'Wait for 10 seconds to enter TYDQ system!'#10);
  SystemTable^.BootServices^.Stall(10000);
  efi_console_clear_screen(systemtable);
+ if(fsi.header.tydqautodetectkernel=true) and ((fsi.userinfolist+fsiindex-2)^.usermanager=true) then
+  begin
+   efi_console_output_string(systemtable,'System detects the TYDQ System install CD,do you want to install the TYDQ System inside the CD?'#10);
+   efi_console_output_string(systemtable,'Your Answer(Y or y is yes,other is no):');
+   efi_console_read_string(systemtable,mystr);
+   if(WstrCmpL(mystr,'y')=0) or (WStrCmpL(mystr,'y')=0) then
+    begin
+     efsle:=efi_list_all_file_system_ext(systemtable);
+     if(efsle.fsrwcount>1) then
+      begin
+       efi_console_output_string(systemtable,'Your EFI System paritions in the computer:'#10);
+       for i:=1 to efsle.fsrwcount do
+        begin
+         partstr:=UintToPWChar(i);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'-:');
+         Wstrfree(partstr);
+         fs1:=(efsle.fsrwcontent+i-1)^; fs1^.OpenVolume(fs1,f1);
+         size:=sizeof(efi_file_system_info);
+         f1^.GetInfo(f1,@efi_file_system_info_id,size,fi1);
+         mysize:=fi2.VolumeSize+fi2.FreeSpace;
+         myfilesystemsize:=mysize/(1024*1024);
+         partstr:=ExtendedToPWChar(myfilesystemsize,2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'MB');
+         efi_console_output_string(systemtable,#10);
+         Wstrfree(partstr);
+        end;
+      end;
+     if(efsle.fsrcount>1) then
+      begin
+       efi_console_output_string(systemtable,'Your Cdroms load in your computer:'#10);
+       for i:=1 to efsle.fsrcount do
+        begin
+         partstr:=UintToPWChar(i);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'-:');
+         Wstrfree(partstr);
+         fs2:=(efsle.fsrwcontent+i-1)^; fs2^.OpenVolume(fs2,f2);
+         size:=sizeof(efi_file_system_info);
+         f2^.GetInfo(f2,@efi_file_system_info_id,size,fi2);
+         mysize:=fi2.VolumeSize+fi2.FreeSpace;
+         myfilesystemsize:=mysize/(1024*1024);
+         partstr:=ExtendedToPWChar(myfilesystemsize,2);
+         efi_console_output_string(systemtable,partstr);
+         efi_console_output_string(systemtable,'MB');
+         efi_console_output_string(systemtable,#10);
+         Wstrfree(partstr);
+        end;
+      end;
+     if(efsle.fsrwcount>1) then
+      begin
+       efi_console_output_string(systemtable,'Which EFI System Partition you want to install to:');
+       efi_console_read_string(systemtable,mystr);
+       pnum1:=PWCharToUint(mystr);
+       while(pnum1=0) or (pnum1>efsle.fsrcount) do
+        begin
+         efi_console_output_string(systemtable,'Error:Invaild EFI System Partition.'#10);
+         efi_console_output_string(systemtable,'Which EFI System Partition you want to install to:');
+         efi_console_read_string(systemtable,mystr);
+         pnum2:=PWCharToUint(mystr);
+        end;
+      end
+     else pnum1:=1;
+     if(efsle.fsrcount>1) then
+      begin
+       efi_console_output_string(systemtable,'Which Cdrom you want to install from:');
+       efi_console_read_string(systemtable,mystr);
+       pnum2:=PWCharToUint(mystr);
+       while(pnum2=0) or (pnum2>efsle.fsrcount) do
+        begin
+         efi_console_output_string(systemtable,'Error:Invaild cdrom.'#10);
+         efi_console_output_string(systemtable,'Which Cdrom you want to install from:');
+         efi_console_read_string(systemtable,mystr);
+         pnum2:=PWCharToUint(mystr);
+        end;
+      end
+     else pnum2:=1;
+     freemem(efsle.fsrwcontent); freemem(efsle.fsrcontent); efsle.fsrwcount:=0; efsle.fsrcount:=0;
+     efi_disk_system_install_from_cdrom(systemtable,pnum1,pnum2);
+     efi_console_output_string(systemtable,'Now the system will automatically reboot for version changing.'#10);
+     SystemTable^.RunTimeServices^.ResetSystem(EfiResetWarm,efi_success,0,nil);
+    end
+   else
+    begin
+     Wstrfree(mystr);
+     efi_console_output_string(systemtable,'Now you will use the already installed version of TYDQ System.'#10);
+     efi_console_clear_screen(systemtable);
+    end;
+  end;
  efi_console_output_string(systemtable,'Type the commands to operate the TYDQ System(type help <command> for help!)'#10);
  efi_console_output_string(systemtable,'Warning:every commands need to have a space to deliter(However you can use " or '#39' to avoid this)!'#10);
  if(fsi.header.tydqgraphics=false) then console_main(systemtable,fsi,fsiindex);
