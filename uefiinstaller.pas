@@ -19,10 +19,7 @@ var mystr,mystr2,mystr3,partstr:PWideChar;
     mybool,havesysinfo:boolean;
     fsi:tydqfs_system_info;
 begin
- {Initialize the system heap and executable heap}
- compheap.heapcount:=0; compheap.heaprest:=maxheap;
- sysheap.heapcount:=0; sysheap.heaprest:=maxheap;
- {Initiailize ended}
+ compheap_initialize; sysheap_initialize;
  efi_console_set_global_colour(Systemtable,efi_bck_black,efi_lightgrey);
  efi_console_clear_screen(systemtable);
  efi_console_get_max_row_and_max_column(systemtable,false);
@@ -40,7 +37,9 @@ begin
   efi_console_output_string(systemtable,'Now you can install the tydq system by using tydq installer!'+#13#10);
   efi_console_output_string(systemtable,'The Cdrom which have install ability to install to hard disk:'+#13#10);
   efi_console_output_string(systemtable,'Total Cdrom Number:');
-  efi_console_output_string(systemtable,UintToPWChar(efsl.file_system_count));
+  partstr:=UintToPWChar(efsl.file_system_count);
+  efi_console_output_string(systemtable,partstr);
+  Wstrfree(partstr);
   efi_console_output_string(systemtable,#13#10);
   efi_console_output_string(systemtable,'Cdrom information:');
   efi_console_output_string(systemtable,#13#10);
@@ -50,27 +49,32 @@ begin
     ((efsl.file_system_content+i-1)^)^.OpenVolume((efsl.file_system_content+i-1)^,efp);
     efp^.GetInfo(efp,@efi_file_system_info_id,realsize,efsi);
     efi_console_output_string(systemtable,'Cdrom');
-    efi_console_output_string(systemtable,UintToPWChar(i));
+    partstr:=UintToPWChar(i);
+    efi_console_output_string(systemtable,partstr);
+    Wstrfree(partstr);
     efi_console_output_string(systemtable,' Size:');
-    efi_console_output_string(systemtable,ExtendedToPWChar(efsi.VolumeSize/(1024*1024),2));
-    efi_console_output_string(systemtable,'MiB');
-    efi_console_output_string(systemtable,#13#10);
+    partstr:=ExtendedToPWChar(efsi.VolumeSize/(1024*1024),2);
+    efi_console_output_string(systemtable,partstr);
+    Wstrfree(partstr);
+    efi_console_output_string(systemtable,'MiB'#10);
     efp^.Close(efp);
    end;
   edl:=efi_detect_disk_write_ability(systemTable);
   efi_console_output_string(systemtable,'Available disk number:');
-  efi_console_output_string(systemtable,UintToPWchar(edl.disk_count));
-  efi_console_output_string(systemtable,#13#10);
-  efi_console_output_string(systemtable,'Available disk to be installed to:');
-  efi_console_output_string(systemtable,#13#10);
+  partstr:=UintToPWchar(edl.disk_count);
+  efi_console_output_string(systemtable,partstr);
+  Wstrfree(partstr);
+  efi_console_output_string(systemtable,#10);
+  efi_console_output_string(systemtable,'Available disk to be installed to:'#10);
   for i:=1 to edl.disk_count do
    begin 
     efi_console_output_string(systemtable,UintToPWChar(i));
     efi_console_output_string(systemtable,'-');
     realsize:=((edl.disk_block_content+i-1)^)^.Media^.BlockSize*(((edl.disk_block_content+i-1)^)^.Media^.LastBlock+1);
-    efi_console_output_string(systemtable,ExtendedToPWChar(realsize/(1024*1024*1024),2));
-    efi_console_output_string(systemtable,'GiB');
-    efi_console_output_string(systemtable,#13#10);
+    partstr:=ExtendedToPWChar(realsize/(1024*1024*1024),2);
+    efi_console_output_string(systemtable,partstr);
+    Wstrfree(partstr);
+    efi_console_output_string(systemtable,'GiB'#10);
    end;
   efi_console_output_string(systemtable,'Do you want to install the cdrom to the hard disk(Y or y is yes,other is no)?'#13#10);
   efi_console_output_string(systemtable,'Your answer:');
@@ -91,6 +95,7 @@ begin
     efi_console_output_string(systemtable,'Your answer:');
     efi_console_read_string(systemtable,mystr);
    end;
+  Wstrfree(mystr);
   if(edl.disk_count=0) then
    begin
     efi_console_output_string(systemtable,'Error:No available disk found,installer terminated.'#13#10);

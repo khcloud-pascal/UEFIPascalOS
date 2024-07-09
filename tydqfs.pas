@@ -241,7 +241,7 @@ function tydq_fs_systeminfo_init(lanindex:word):tydqfs_system_info;
 procedure tydq_fs_create_systeminfo_file(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint);
 function tydq_fs_systeminfo_read(systemtable:Pefi_system_table;edl:efi_disk_list):tydqfs_system_info;
 procedure tydq_fs_systeminfo_write(systemtable:Pefi_system_table;edl:efi_disk_list;writeinfo:tydqfs_system_info);
-function tydq_fs_systeminfo_disk_index(systemtable:Pefi_system_table;edl:efi_disk_list):natuint;
+function tydq_fs_systeminfo_disk_index(edl:efi_disk_list):natuint;
 procedure tydq_fs_systeminfo_add_user(var sysinfo:tydqfs_system_info;newusername,newuserpasswd:PWideChar;Manager:boolean);
 procedure tydq_fs_systeminfo_delete_user(var sysinfo:tydqfs_system_info;username:PWideChar);
 function tydq_fs_systeminfo_get_passwd(sysinfo:tydqfs_system_info;username:PWideChar):PWideChar;
@@ -1361,7 +1361,7 @@ begin
  strset(total_info_str,'[SystemInfo]'#10);
  strCat(total_info_str,'Graphics=False'#10);
  strCat(total_info_str,'EnableNetwork=False'#10);
- StrCat(total_info_str,'tydqautodetectkernel=False'#10);
+ StrCat(total_info_str,'AutoDetectKernel=False'#10);
  strCat(total_info_str,'Language=English'#10);
  strCat(total_info_str,'UserCount=0');
  encrypted_info_str:=PChar_encrypt_to_passwd(total_info_str);
@@ -1399,7 +1399,7 @@ begin
  while(i<=len) do
   begin
    inc(optionnum);
-   if(optionnum>=userstartindex) and (usercount<(optionnum-userstartindex-1) div 3) then
+   if(optionnum>=userstartindex) and (usercount<(optionnum-userstartindex+1) div 3) then
     begin
      freemem(res.userinfolist); break;
     end
@@ -1415,12 +1415,12 @@ begin
      optionstr:=strcutout(partstr,1,optionpos-1);
      valuestr:=strcutout(partstr,optionpos+1,strlen(partstr));
     end;
-   if(optionnum=1) and (strcmp(partstr,'[SystemInfo]')<>0) then
+   if(optionnum=1) and (strcmpL(partstr,'[SystemInfo]')<>0) then
     begin
      res:=tydq_fs_systeminfo_init(0); break;
     end
    else if(optionnum=1) then issysteminfo:=true;
-   if(optionnum=2) and (strcmp(optionstr,'Graphics')<>0) then
+   if(optionnum=2) and (strcmpL(optionstr,'Graphics')<>0) then
     begin
      res:=tydq_fs_systeminfo_init(0); break;
     end
@@ -1428,7 +1428,7 @@ begin
     begin
      if(strcmp(valuestr,'True')=0) and (strlen(valuestr)=4) then res.header.tydqgraphics:=true else res.header.tydqgraphics:=false;
     end;
-   if(optionnum=3) and (strcmp(optionstr,'EnableNetwork')<>0) then
+   if(optionnum=3) and (strcmpL(optionstr,'EnableNetwork')<>0) then
     begin
      res:=tydq_fs_systeminfo_init(0); break;
     end
@@ -1436,7 +1436,7 @@ begin
     begin
      if(strcmp(valuestr,'True')=0) and (strlen(valuestr)=4) then res.header.tydqnetwork:=true else res.header.tydqnetwork:=false;
     end;
-   if(optionnum=4) and (strcmp(optionstr,'AutoDetectKernel')<>0) then
+   if(optionnum=4) and (strcmpL(optionstr,'AutoDetectKernel')<>0) then
     begin
      res:=tydq_fs_systeminfo_init(0); break;
     end
@@ -1444,7 +1444,7 @@ begin
     begin
      if(strcmp(valuestr,'True')=0) and (strlen(valuestr)=4) then res.header.tydqautodetectkernel:=true else res.header.tydqautodetectkernel:=false;
     end;
-   if(optionnum=5) and (strcmp(optionstr,'Language')<>0) then
+   if(optionnum=5) and (strcmpL(optionstr,'Language')<>0) then
     begin
      res:=tydq_fs_systeminfo_init(0); break;
     end
@@ -1452,7 +1452,7 @@ begin
     begin
      if(strcmp(valuestr,'English')=0) and (strlen(valuestr)=7) then res.header.tydqsyslang:=1 else res.header.tydqsyslang:=2;
     end;
-   if(optionnum=6) and (strcmp(optionstr,'UserCount')<>0) then
+   if(optionnum=6) and (strcmpL(optionstr,'UserCount')<>0) then
     begin
      res:=tydq_fs_systeminfo_init(0); break;
     end
@@ -1461,7 +1461,7 @@ begin
      usercount:=PCharToUint(valuestr);
      res.header.tydqusercount:=usercount;
     end;
-   if(optionnum>=userstartindex) and ((optionnum-userstartindex+1) mod 3=1) and (strcmp(optionstr,'UserName')<>0) then
+   if(optionnum>=userstartindex) and ((optionnum-userstartindex+1) mod 3=1) and (strcmpL(optionstr,'UserName')<>0) then
     begin
      res:=tydq_fs_systeminfo_init(0); break;
     end
@@ -1472,9 +1472,9 @@ begin
       Wstrinit((res.userinfolist+(optionnum-userstartindex+1) div 3)^.username,strlen(valuestr));
       Wstrset((res.userinfolist+(optionnum-userstartindex+1) div 3)^.username,partstr2);
       freemem(partstr2);
-      (res.userinfolist+(optionnum-userstartindex+1) div 3)^.username:=PWideChar(Pointer((res.userinfolist+(optionnum-5) div 3)^.username)-mysize);
+      (res.userinfolist+(optionnum-userstartindex+1) div 3)^.username:=Pointer(Pointer((res.userinfolist+(optionnum-userstartindex+1) div 3)^.username)-mysize);
     end;
-   if(optionnum>=userstartindex) and ((optionnum-userstartindex+1) mod 3=2) and (strcmp(optionstr,'UserPasswd')<>0) then
+   if(optionnum>=userstartindex) and ((optionnum-userstartindex+1) mod 3=2) and (strcmpL(optionstr,'UserPasswd')<>0) then
     begin
      res:=tydq_fs_systeminfo_init(0); break;
     end
@@ -1485,9 +1485,9 @@ begin
       Wstrinit((res.userinfolist+(optionnum-userstartindex+1) div 3)^.userpasswd,strlen(valuestr));
       Wstrset((res.userinfolist+(optionnum-userstartindex+1) div 3)^.userpasswd,partstr2);
       freemem(partstr2);
-      (res.userinfolist+(optionnum-userstartindex+1) div 3)^.userpasswd:=PWideChar(Pointer((res.userinfolist+(optionnum-5) div 3)^.userpasswd)-mysize);
+      (res.userinfolist+(optionnum-userstartindex+1) div 3)^.userpasswd:=Pointer(Pointer((res.userinfolist+(optionnum-userstartindex+1) div 3)^.userpasswd)-mysize);
     end;
-   if(optionnum>=userstartindex) and ((optionnum-userstartindex+1) mod 3=0) and (strcmp(optionstr,'UserManager')<>0) then
+   if(optionnum>=userstartindex) and ((optionnum-userstartindex+1) mod 3=0) and (strcmpL(optionstr,'UserManager')<>0) then
     begin 
      res:=tydq_fs_systeminfo_init(0); break;
     end
@@ -1500,19 +1500,20 @@ begin
     end;
    if(optionnum>1) then
     begin
-     mysize:=getmemsize(partstr)+getmemsize(optionstr)+getmemsize(valuestr);
+     mysize:=getmemsize(optionstr)+getmemsize(valuestr);
      strfree(valuestr); strfree(optionstr);
     end;
+   mysize:=mysize+getmemsize(partstr);
    strfree(partstr);
    if(optionnum>=userstartindex) and ((optionnum-userstartindex+1) mod 3=1) then
     begin
      (res.userinfolist+(optionnum-userstartindex+1) div 3)^.username:=
-     PWideChar(Pointer((res.userinfolist+(optionnum-userstartindex+1) div 3)^.username)-mysize);
+     Pointer(Pointer((res.userinfolist+(optionnum-userstartindex+1) div 3)^.username)-mysize);
     end
    else if(optionnum>=userstartindex) and ((optionnum-userstartindex+1) mod 3=2) then
     begin
      (res.userinfolist+(optionnum-userstartindex+1) div 3)^.userpasswd:=
-     PWideChar(Pointer((res.userinfolist+(optionnum-userstartindex+1) div 3)^.userpasswd)-mysize);
+     Pointer(Pointer((res.userinfolist+(optionnum-userstartindex+1) div 3)^.userpasswd)-mysize);
     end;
    if(j>0) then i:=j+1 else break; 
   end;
@@ -1521,8 +1522,8 @@ begin
  res.userinfolist:=Pointer(Pointer(res.userinfolist)-mysize);
  for i:=1 to usercount do
   begin
-   (res.userinfolist+i-1)^.username:=PWideChar(Pointer((res.userinfolist+i-1)^.username)-mysize);
-   (res.userinfolist+i-1)^.userpasswd:=PWideChar(Pointer((res.userinfolist+i-1)^.userpasswd)-mysize);
+   (res.userinfolist+i-1)^.username:=Pointer(Pointer((res.userinfolist+i-1)^.username)-mysize);
+   (res.userinfolist+i-1)^.userpasswd:=Pointer(Pointer((res.userinfolist+i-1)^.userpasswd)-mysize);
   end;
  tydq_fs_systeminfo_read:=res;
 end;
@@ -1601,7 +1602,7 @@ begin
   strfree(passwdstr);
   strfree(orgstr);
 end;
-function tydq_fs_systeminfo_disk_index(systemtable:Pefi_system_table;edl:efi_disk_list):natuint;[public,alias:'TYDQ_FS_SYSTEMINFO_DISK_INDEX'];
+function tydq_fs_systeminfo_disk_index(edl:efi_disk_list):natuint;[public,alias:'TYDQ_FS_SYSTEMINFO_DISK_INDEX'];
 var index:natuint;
     fsf:tydqfs_file;
 begin
@@ -1675,7 +1676,7 @@ begin
  i:=1;
  while(i<=sysinfo.header.tydqusercount) do
   begin
-   if(Wstrcmp((sysinfo.userinfolist+i-1)^.username,username)=0) and (Wstrlen((sysinfo.userinfolist+i-1)^.username)=Wstrlen(username)) then break;
+   if(WstrcmpL((sysinfo.userinfolist+i-1)^.username,username)=0) then break;
    inc(i);
   end;
  if(i>sysinfo.header.tydqusercount) then exit(nil) 

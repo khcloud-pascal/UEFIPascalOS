@@ -5,6 +5,7 @@ interface
 uses tydqfs,uefi;
 const shell_string:byte=$00;
       shell_int:byte=$01;
+      
 type shell_error_item=record
                       errorrow:natuint;
                       errorcolumn:natuint;
@@ -33,8 +34,10 @@ type shell_error_item=record
                            startline,endline:natuint;
                            end;
      shell_switchitemstatement=packed record
-                               itemvalue:shell_string_index;
-                               startline,endline:natuint;
+                               itemvalue:^shell_string_index;
+                               itemvaluecount:natuint;
+                               startline,endline:natuint; 
+                               havebreak:boolean;
                                end;
      shell_loopstatement=packed record
                          condition:shell_string_index;
@@ -82,6 +85,10 @@ type shell_error_item=record
      Pshell_switchstatement=^shell_switchstatement;
      Pshell_loopstatement=^shell_loopstatement;
      Pshell_expression=^shell_expression;
+
+var shell_edl:efi_disk_list;
+    shell_procnum:natuint;
+    shell_str:PWideChar;
 
 procedure shell_execute_code(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;var sysinfo:tydqfs_system_info;var sysindex:natuint);
 implementation
@@ -686,23 +693,6 @@ begin
      Wstrfree(mycondstr);
      res.errorindex:=Pointer(Pointer(res.errorindex)-size);
     end
-   else if(WstrpartcmpL(totalstr,(mypartlist.errorpos+i-1)^,
-   (mypartlist.errorlen+i-1)^,'case')=0) then
-    begin
-     if(WstrpartcmpL(totalstr,(mypartlist.errorpos+i+1)^,
-     (mypartlist.errorlen+i+1)^,'case')=0) then
-      begin
-       inc(i,2);
-       inc(res.errorcount);
-       ReallocMem(res.errorindex,sizeof(shell_error_item)*res.errorcount);
-       partstr:=Wstrcopy(totalstr,1,(mypartlist.errorpos+mypartlist.errorcount+1)^);
-       (res.errorindex+res.errorcount-1)^.errorrow:=Wstrcount(partstr,#10,1)+1;
-       (res.errorindex+res.errorcount-1)^.errorcolumn:=
-       i-Wstrposorder(partstr,#10,1,Wstrcount(partstr,#10,1));
-       (res.errorindex+res.errorcount-1)^.errortype:=8;
-       Wstrfree(partstr);
-      end;
-    end
    else
     begin
      inc(i,1);
@@ -712,8 +702,8 @@ begin
 end;
 procedure shell_create_tree(var tree:shell_tree;totalstr:PWideChar;startindex,endindex:natuint);
 var mystack:shell_temporary_stack;
-    i,j,k,m,len,lineindex,baseindex,stackindex,childnumber,index,totalline:natuint;
-    procnum1,procnum2,procnum3,procnum4,procnum5,procnum6:natuint;
+    i,j,k,m,n,len,lineindex,baseindex,stackindex,childnumber,index,totalline:natuint;
+    procnum1,procnum2,procnum3,procnum4,procnum5,procnum6,procnum7,procnum8,procnum9:natuint;
     line:PWideChar;
 begin
  i:=startindex; len:=endindex;
@@ -887,10 +877,41 @@ begin
          (tree.child+index-1)^.parent:=@tree;
          (tree.child+index-1)^.treetype:=7;
          (tree.child+index-1)^.content:=allocmem(sizeof(shell_switchitemstatement));
-         Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvalue.position:=procnum1+1;
-         Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvalue.length:=procnum2-procnum1-1;
+         Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvaluecount:=1;
+         procnum7:=procnum5-1;
+         while(procnum7>0) do
+          begin
+           procnum8:=Wstrposorder(totalstr,#10,1,procnum7-1);
+           procnum9:=Wstrposorder(totalstr,#10,1,procnum7);
+           if(Wstrpartcmp(totalstr,procnum8+1,procnum9-procnum8-1,'case ')=0) then
+            begin
+             inc(Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvaluecount);
+            end
+           else break;
+           dec(procnum7);
+          end;
+         Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvalue:=
+         allocmem(sizeof(shell_string_index)*Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvaluecount); 
+         procnum7:=procnum5; n:=0;
+         while(n<Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvaluecount) do
+          begin
+           inc(n,1);
+           procnum8:=Wstrposorder(totalstr,#10,1,procnum7+n-2);
+           procnum9:=Wstrposorder(totalstr,#10,1,procnum7+n-1);
+           if(Wstrpartcmp(totalstr,procnum8+1,procnum9-procnum8-1,'case ')=0) then
+            begin
+             (Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvalue+n-1)^.position:=procnum8;
+             (Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvalue+n-1)^.length:=procnum9-procnum8-1;
+            end
+           else break;
+          end;
          Pshell_switchitemstatement((tree.child+index-1)^.content)^.startline:=procnum5+2;
          Pshell_switchitemstatement((tree.child+index-1)^.content)^.endline:=procnum6-2;
+         if(Wstrpartcmp(totalstr,procnum3+1,procnum4-procnum3-1,'break')=0) then
+          begin
+           Pshell_switchitemstatement((tree.child+index-1)^.content)^.havebreak:=true;
+          end
+         else Pshell_switchitemstatement((tree.child+index-1)^.content)^.havebreak:=false;
          shell_create_tree((tree.child+index-1)^,totalstr,procnum2+3,procnum3-3);
         end
        else
@@ -1003,14 +1024,66 @@ begin
        Pshell_loopstatement((tree.child+index-1)^.content)^.endline:=procnum6-2;
        shell_create_tree((tree.child+index-1)^,totalstr,procnum2+3,procnum3-3);
       end
-     else
+     else if(Wstrpartcmp(totalstr,procnum1+1,procnum2-procnum1-1,'case ')<>0) then
       begin
        (tree.child+index-1)^.parent:=@tree;
        (tree.child+index-1)^.treetype:=1;
        (tree.child+index-1)^.content:=allocmem(sizeof(shell_expression));
        Pshell_expression((tree.child+index-1)^.content)^.content.position:=procnum1+1;
        Pshell_expression((tree.child+index-1)^.content)^.content.length:=procnum2-procnum1-1;
-      end;
+      end
+     else if(Wstrpartcmp(totalstr,procnum3+1,procnum4-procnum3-1,'case ')<>0) then
+      begin
+       if(tree.parent^.treetype=3) then
+        begin
+         (tree.child+index-1)^.parent:=@tree;
+         (tree.child+index-1)^.treetype:=7;
+         (tree.child+index-1)^.content:=allocmem(sizeof(shell_switchitemstatement));
+         Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvaluecount:=1;
+         procnum7:=procnum5-1;
+         while(procnum7>0) do
+          begin
+           procnum8:=Wstrposorder(totalstr,#10,1,procnum7-1);
+           procnum9:=Wstrposorder(totalstr,#10,1,procnum7);
+           if(Wstrpartcmp(totalstr,procnum8+1,procnum9-procnum8-1,'case ')=0) then
+            begin
+             inc(Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvaluecount);
+            end
+           else break;
+           dec(procnum7);
+          end;
+         Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvalue:=
+         allocmem(sizeof(shell_string_index)*Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvaluecount); 
+         procnum7:=procnum5; n:=0;
+         while(n<Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvaluecount) do
+          begin
+           inc(n,1);
+           procnum8:=Wstrposorder(totalstr,#10,1,procnum7+n-2);
+           procnum9:=Wstrposorder(totalstr,#10,1,procnum7+n-1);
+           if(Wstrpartcmp(totalstr,procnum8+1,procnum9-procnum8-1,'case ')=0) then
+            begin
+             (Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvalue+n-1)^.position:=procnum8;
+             (Pshell_switchitemstatement((tree.child+index-1)^.content)^.itemvalue+n-1)^.length:=procnum9-procnum8-1;
+            end
+           else break;
+          end;
+         Pshell_switchitemstatement((tree.child+index-1)^.content)^.startline:=procnum5+2;
+         Pshell_switchitemstatement((tree.child+index-1)^.content)^.endline:=procnum6-2;
+         if(Wstrpartcmp(totalstr,procnum3+1,procnum4-procnum3-1,'break')=0) then
+          begin
+           Pshell_switchitemstatement((tree.child+index-1)^.content)^.havebreak:=true;
+          end
+         else Pshell_switchitemstatement((tree.child+index-1)^.content)^.havebreak:=false;
+         shell_create_tree((tree.child+index-1)^,totalstr,procnum2+3,procnum3-3);
+        end
+       else
+        begin
+         (tree.child+index-1)^.parent:=@tree;
+         (tree.child+index-1)^.treetype:=0;
+         (tree.child+index-1)^.content:=nil;
+         shell_create_tree((tree.child+index-1)^,totalstr,procnum2+3,procnum3-3);
+        end;
+      end
     end;
   end;
 end;
@@ -1278,12 +1351,15 @@ end;
 function shell_condition_calculate(conditionstr:PWideChar;varlist:shell_variable_list):boolean;
 var condstr,partstr,partstr1,partstr2,partstr3:PWideChar;
     procnum1,procnum2,procnum3,procnum4:natuint;
+    cmpnum:natint;
     status,ftype:byte;
     stack:shell_temporary_stack;
     condlist:shell_temporary_condition;
     resstr:PWideChar;
+    procnum:natuint;
+    partstr4:PWideChar;
     inverse,res:boolean;
-    i,j,k,m,n,len,len2,procnum,baseindex,baselen:natuint;
+    i,j,k,m,n,len,len2,baseindex,baselen:natuint;
 begin
  Wstrinit(condstr,65535);
  Wstrset(condstr,conditionstr);
@@ -1660,8 +1736,39 @@ begin
        if(WstrcmpL(partstr2,'fileexists')=0) then
         begin
          resstr:=shell_expression_calculate_string(partstr,varlist);
-         res:=false;
+         procnum:=tydq_fs_locate_diskindex(shell_edl,resstr);
+         partstr4:=tydq_fs_locate_fullpath(shell_edl,resstr);
+         res:=tydq_fs_file_exists(shell_edl,procnum,resstr);
+         Wstrfree(partstr4);
          Wstrfree(resstr);
+        end
+       else if(WStrCmpL(partstr2,'issystempartition')=0) then
+        begin
+         resstr:=shell_expression_calculate_string(partstr,varlist);
+         procnum:=tydq_fs_systeminfo_disk_index(shell_edl);
+         partstr4:=tydq_fs_locate_fullpath(shell_edl,resstr);
+         res:=tydq_fs_file_exists(shell_edl,procnum,resstr);
+         Wstrfree(partstr4);
+         Wstrfree(resstr);
+        end
+       else if(WstrcmpL(partstr2,'isuserpath')=0) or (WstrcmpL(partstr2,'isdefaultpath')=0) then
+        begin
+         resstr:=shell_expression_calculate_string(partstr,varlist);
+         procnum:=tydq_fs_systeminfo_disk_index(shell_edl);
+         Wstrinit(partstr4,32768); Wstrset(partstr4,'/usrsp/'); Wstrcat(partstr4,shell_str);
+         res:=tydq_fs_file_exists(shell_edl,procnum,resstr);
+         Wstrfree(partstr4);
+         Wstrfree(resstr);
+        end
+       else if(WStrcmpL(partstr2,'isplatform')=0) then
+        begin
+         resstr:=shell_expression_calculate_string(partstr,varlist);
+         if(WstrcmpL(resstr,'x64')=0) and (efi_get_platform=0) then res:=true
+         else if(WStrcmpL(resstr,'aarch64')=0) and (efi_get_platform=1) then res:=true
+         else if(WstrcmpL(resstr,'loongarch64')=0) and (efi_get_platform=2) then res:=true
+         else if(WStrcmpL(resstr,'riscv64')=0) and (efi_get_platform=3) then res:=true
+         else if(WStrcmpL(resstr,'riscv128')=0) and (efi_get_platform=4) then res:=true
+         else res:=false;
         end
        else if(WstrcmpL(partstr2,'isint')=0) then
         begin
@@ -1693,7 +1800,7 @@ begin
  Wstrfree(condstr);
 end;
 procedure shell_execute_tree(systemtable:Pefi_system_table;tree:shell_tree;totalstr:PWideChar;var varlist:shell_variable_list;var sysinfo:tydqfs_system_info;var sysindex:natuint);
-var i,j,len:natuint;
+var i,j,m,n,len:natuint;
     procnum,procnum1,procnum2,procnum3:natint;
     partstr1:PWideChar=nil;
     partstr2:PWideChar=nil;
@@ -1712,7 +1819,7 @@ begin
   begin
    for i:=1 to tree.childcount do
     begin
-     shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
+     shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
     end;
   end
  else if(tree.treetype=1) then
@@ -1825,7 +1932,7 @@ begin
       begin
        for i:=1 to tree.childcount do
         begin
-         shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
+         shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
         end;
       end;
      Wstrfree(partstr3);
@@ -1850,7 +1957,7 @@ begin
       begin
        for i:=1 to tree.childcount do
         begin
-         shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
+         shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
         end;
       end;
      Wstrfree(partstr3);
@@ -1860,7 +1967,7 @@ begin
     begin
      for i:=1 to tree.childcount do
       begin
-       shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
+       shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
       end;
     end
   end
@@ -1868,7 +1975,7 @@ begin
   begin
    for i:=1 to tree.childcount do
     begin
-     shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
+     shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
     end;
   end
  else if(tree.treetype=4) then
@@ -1902,7 +2009,7 @@ begin
         begin
          for i:=1 to tree.childcount do
           begin
-           shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
+           shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
           end;
         end;
       end
@@ -1912,7 +2019,7 @@ begin
         begin
          for i:=1 to tree.childcount do
           begin
-           shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
+           shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
           end;
         end;
       end;
@@ -1946,7 +2053,7 @@ begin
        resbool:=shell_condition_calculate(partstr3,varlist);
        for i:=1 to tree.childcount do
         begin
-         shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
+         shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
         end;
       end;
      Wstrfree(partstr3);
@@ -1975,7 +2082,7 @@ begin
       begin
        for i:=1 to tree.childcount do
         begin
-         shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
+         shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
         end;
       end;
      until(resbool=false);
@@ -1998,28 +2105,35 @@ begin
       begin
        partstr2:=Wstrcopy(partstr1,7,len-6);
       end;
-     partstr3:=Wstrcopy(totalstr,Pshell_switchitemstatement(tree.content)^.itemvalue.position+5,
-     Pshell_switchitemstatement(tree.content)^.itemvalue.length-5);
-     procnum:=shell_variable_list_index(varlist,partstr1);
-     if((varlist.itemlist+procnum-1)^.vartype=shell_string) then
+     n:=1; m:=Pshell_switchitemstatement(tree.content)^.itemvaluecount;
+     while(n<=m) do
       begin
-       if(shell_variable_list_item_compare(varlist,partstr1,partstr3)=true) then
+       inc(n,1);
+       partstr3:=Wstrcopy(totalstr,(Pshell_switchitemstatement(tree.content)^.itemvalue+n-1)^.position+5,
+       (Pshell_switchitemstatement(tree.content)^.itemvalue+n-1)^.length-5);
+       procnum:=shell_variable_list_index(varlist,partstr1);
+       if((varlist.itemlist+procnum-1)^.vartype=shell_string) then
         begin
-         for i:=1 to tree.childcount do
+         if(shell_variable_list_item_compare(varlist,partstr1,partstr3)=true) then
           begin
-           shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
+           for i:=1 to tree.childcount do
+            begin
+             shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
+            end;
+           if(Pshell_switchitemstatement(tree.content)^.havebreak=true) then break;
           end;
-        end;
-      end
-     else if((varlist.itemlist+procnum-1)^.vartype=shell_int) then
-      begin
-       procnum:=PWCharToInt(partstr3);
-       if(shell_variable_list_item_compare(varlist,partstr1,@procnum)=true) then
+         end
+       else if((varlist.itemlist+procnum-1)^.vartype=shell_int) then
         begin
-         for i:=1 to tree.childcount do
+         procnum:=PWCharToInt(partstr3);
+         if(shell_variable_list_item_compare(varlist,partstr1,@procnum)=true) then
           begin
-           shell_execute_tree(systemtable,tree,totalstr,varlist,sysinfo,sysindex);
-          end;
+           for i:=1 to tree.childcount do
+            begin
+             shell_execute_tree(systemtable,(tree.child+i-1)^,totalstr,varlist,sysinfo,sysindex);
+            end;
+          if(Pshell_switchitemstatement(tree.content)^.havebreak=true) then break;
+         end;
         end;
       end;
     end;
@@ -2027,6 +2141,7 @@ begin
 end;
 procedure shell_destroy_tree(tree:shell_tree);
 var i:natuint;
+    p:Pshell_switchitemstatement;
 begin
  if(tree.child=nil) then
   begin
@@ -2039,6 +2154,12 @@ begin
      shell_destroy_tree((tree.child+i-1)^);
     end;
    freemem(tree.child);
+   if(tree.treetype=7) then
+    begin
+     p:=tree.content;
+     freemem(p^.itemvalue);
+     p^.itemvaluecount:=0;
+    end;
    freemem(tree.content);
    tree.childcount:=0;
   end;
@@ -2108,10 +2229,6 @@ begin
      else if((error_list.errorindex+i-1)^.errortype=7) then
       begin
        efi_console_output_string(systemtable,'For statement lakcs final value of the variable.'#10);
-      end
-     else if((error_list.errorindex+i-1)^.errortype=8) then
-      begin
-       efi_console_output_string(systemtable,'Cases not allowed to combined to one situation.'#10);
       end;
     end;
   end;

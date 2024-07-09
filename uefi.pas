@@ -3922,7 +3922,6 @@ begin
        mbr.Partition[j].SizeInLBA:=$00000000;
       end;
     end;
-   efi_console_output_string(systemtable,'S2');
    mbr.signature:=$AA55;
    gpt.signature:=$5452415020494645;
    gpt.revision:=$00010000;
@@ -4162,6 +4161,12 @@ begin
      (redl.disk_block_content+redl.disk_count-1)^:=procblock;
     end;
   end;
+ size:=getmemsize(redl.disk_content);
+ ReallocMem(redl.disk_content,sizeof(Pointer)*redl.disk_count);
+ redl.disk_block_content:=Pointer(Pointer(redl.disk_block_content)-size);
+ size:=getmemsize(redl.disk_block_content);
+ ReallocMem(redl.disk_block_content,sizeof(Pointer)*redl.disk_count);
+ redl.disk_content:=Pointer(Pointer(redl.disk_content)-size);
  size:=getmemsize(edl.disk_content)+getmemsize(edl.disk_block_content);
  freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
  redl.disk_block_content:=Pointer(Pointer(redl.disk_block_content)-size);
@@ -4177,8 +4182,8 @@ var edl,redl:efi_disk_list;
 begin
  edl:=efi_detect_disk_write_ability(systemtable); 
  redl.disk_count:=0;
- redl.disk_content:=allocmem(sizeof(Pointer)*1024); 
- redl.disk_block_content:=allocmem(sizeof(Pointer)*1024);
+ redl.disk_content:=allocmem(sizeof(Pointer)*edl.disk_count); 
+ redl.disk_block_content:=allocmem(sizeof(Pointer)*edl.disk_count);
  for i:=1 to edl.disk_count do
   begin
    procdisk:=(edl.disk_content+i-1)^;
@@ -4191,6 +4196,12 @@ begin
      (redl.disk_block_content+redl.disk_count-1)^:=procblock;
     end;
   end;
+ size:=getmemsize(redl.disk_content);
+ ReallocMem(redl.disk_content,sizeof(Pointer)*redl.disk_count);
+ redl.disk_block_content:=Pointer(Pointer(redl.disk_block_content)-size);
+ size:=getmemsize(redl.disk_block_content);
+ ReallocMem(redl.disk_block_content,sizeof(Pointer)*redl.disk_count);
+ redl.disk_content:=Pointer(Pointer(redl.disk_content)-size);
  size:=getmemsize(edl.disk_block_content)+getmemsize(edl.disk_content);
  freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
  redl.disk_block_content:=Pointer(Pointer(redl.disk_block_content)-size);

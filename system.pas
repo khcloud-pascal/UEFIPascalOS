@@ -168,6 +168,7 @@ procedure fpc_freemem(var p:pointer);compilerproc;
 function fpc_allocmem(size:natuint):Pointer;compilerproc;
 procedure fpc_reallocmem(var p:Pointer;size:natuint);compilerproc;
 procedure fpc_move(const source;var dest;count:natuint);compilerproc;
+procedure compheap_initialize;
 function getmem(size:natuint):Pointer;
 procedure freemem(var p:pointer);
 function allocmem(size:natuint):Pointer;
@@ -175,6 +176,7 @@ function getmemsize(p:Pointer):natuint;
 procedure reallocmem(var p:Pointer;size:natuint);
 procedure move(const source;var dest;count:natuint);
 procedure sysheap_clear_all;
+procedure sysheap_initialize;
 function exe_heap_getmem(size:natuint):Pointer;
 function exe_heap_allocmem(size:natuint):Pointer;
 procedure exe_heap_freemem(var p:Pointer);
@@ -182,6 +184,7 @@ function exe_heap_getmemsize(p:Pointer):natuint;
 procedure exe_heap_reallocmem(var p:Pointer;size:natuint);
 procedure exe_heap_move(var dest;const source;size:natuint);
 procedure exe_heap_clear_all;
+procedure exe_heap_initialize;
 function frac(x:extended):extended;
 function optimize_integer_divide(a,b:natuint):natuint;
 function optimize_integer_modulo(a,b:natuint):natuint;
@@ -444,6 +447,10 @@ begin
  sysheap.heapsection[sysheap.heapcount,2]:=0; 
  dec(sysheap.heapcount); inc(sysheap.heaprest,len);
 end;
+procedure compheap_initialize;[public,alias:'compheap_initialize'];
+begin
+ compheap.heapcount:=0; compheap.heaprest:=maxheap;
+end;
 function getmem(size:natuint):Pointer;[public,alias:'getmem'];
 var i,istart,cstart:natuint;
 begin
@@ -506,6 +513,10 @@ var i,len,orgsize:Natuint;
     po1,po2:Pbyte;
 begin
  newp:=getmem(size);
+ if(newp=nil) then
+  begin
+   sysheap_delete_item(p); p:=nil; exit;
+  end;
  if(p=nil) then
   begin 
    p:=newp; exit;
@@ -541,6 +552,10 @@ begin
  for i:=1 to count do (p2+i-1)^:=(p1+i-1)^;
 end;
 procedure sysheap_clear_all;[public,alias:'sysheap_clear_all'];
+begin
+ sysheap.heapcount:=0; sysheap.heaprest:=maxheap;
+end;
+procedure sysheap_initialize;[public,alias:'sysheap_initialize'];
 begin
  sysheap.heapcount:=0; sysheap.heaprest:=maxheap;
 end;
@@ -648,6 +663,10 @@ var p1,p2:PByte;
     i,index,orgsize,offset:natuint;
 begin
  p2:=exe_heap_allocmem(size);
+ if(p2=nil) then
+  begin
+   exe_heap_delete_item(p); p:=nil; exit;
+  end;
  if(p=nil) then
   begin
    p:=p2; exit;
@@ -692,6 +711,10 @@ begin
   end;
 end;                  
 procedure exe_heap_clear_all;[public,alias:'exe_heap_clear_all'];
+begin
+ exe_heap.heap_count:=0; exe_heap.heap_rest_volume:=exe_heap_content_max_volume*sizeof(word);
+end;
+procedure exe_heap_initialize;[public,alias:'exe_heap_initialize'];
 begin
  exe_heap.heap_count:=0; exe_heap.heap_rest_volume:=exe_heap_content_max_volume*sizeof(word);
 end;

@@ -33,7 +33,7 @@ begin
    efi_console_output_string(systemtable,'@');
    efi_console_output_string(systemtable,'TYDQSystem:');
    edl:=efi_disk_tydq_get_fs_list(systemtable);
-   procnum:=tydq_fs_systeminfo_disk_index(systemtable,edl);
+   procnum:=tydq_fs_systeminfo_disk_index(edl);
    fsh:=tydq_fs_read_header(edl,procnum);
    if(Wstrcmp(@fsh.RootName,tydqcurrentdiskname)<>0) or (Wstrlen(@fsh.RootName)<>Wstrlen(tydqcurrentdiskname)) then   
     begin
@@ -1241,7 +1241,8 @@ begin
        freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
        exit;
       end;
-     edl:=efi_disk_tydq_get_fs_list(systemtable);
+     edl:=efi_disk_tydq_get_fs_list(systemtable); shell_edl:=edl;
+     Wstrinit(shell_str,32768); Wstrset(shell_str,(sysinfo.userinfolist+sysindex-2)^.username);
      for i:=3 to cpstr.partstrnum do
       begin
        partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+i-1)^);
@@ -1249,6 +1250,7 @@ begin
        shell_execute_code(systemtable,edl,procnum,partstr5,userlevel_system,sysinfo,sysindex);
        Wstrfree(partstr5);
       end;
+     Wstrfree(shell_str);
      freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
     end
    else if(WstrcmpL((cpstr.partstrlist+1)^,'readexe')=0) then
@@ -2149,6 +2151,9 @@ begin
        efi_console_output_string(systemtable,'while(statement){expression}'#10);
        efi_console_output_string(systemtable,'do{expression}while(statement)'#10);
        efi_console_output_string(systemtable,'switch(variable){case 0:{expression}break;...}'#10);
+       efi_console_output_string(systemtable,'You can also use these function in condition judgement statement:'#10);
+       efi_console_output_string(systemtable,'fileexist(<path>) issystempartition() isuserpath/isdefaultpath()'#10);
+       efi_console_output_string(systemtable,'isplatform(<architecture name>) isint(<integer variable>) isstring(<string variable>)'#10);
       end
      else if(WStrCmpL((cpstr.partstrlist+2)^,'readexe')=0) then
       begin
@@ -3459,14 +3464,16 @@ begin
        freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
        exit;
       end;
-     edl:=efi_disk_tydq_get_fs_list(systemtable);
+     edl:=efi_disk_tydq_get_fs_list(systemtable); shell_edl:=edl;
+     Wstrinit(shell_str,32768); Wstrset(shell_str,(sysinfo.userinfolist+sysindex-2)^.username);
      for i:=2 to cpstr.partstrnum do
       begin
        partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+i-1)^);
        procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+i-1)^);
-       shell_execute_code(systemtable,edl,procnum,partstr5,userlevel_system,sysinfo,sysindex);
+       shell_execute_code(systemtable,edl,procnum,partstr5,userlevel_user,sysinfo,sysindex);
        Wstrfree(partstr5);
       end;
+     Wstrfree(shell_str);
      freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
     end
    else if(WstrcmpL(cpstr.partstrlist^,'readexe')=0) then
@@ -4115,6 +4122,9 @@ begin
        efi_console_output_string(systemtable,'while(statement){expression}'#10);
        efi_console_output_string(systemtable,'do{expression}while(statement)'#10);
        efi_console_output_string(systemtable,'switch(variable){case 0:{expression}break;...}'#10);
+       efi_console_output_string(systemtable,'You can also use these function in condition judgement statement:'#10);
+       efi_console_output_string(systemtable,'fileexist(<path>) issystempartition() isuserpath/isdefaultpath()'#10);
+       efi_console_output_string(systemtable,'isplatform(<architecture name>) isint(<integer variable>) isstring(<string variable>)'#10);
       end
      else if(WStrCmpL((cpstr.partstrlist+1)^,'readexe')=0) then
       begin
@@ -4251,7 +4261,7 @@ begin
  edl:=efi_disk_tydq_get_fs_list(systemtable);
  Wstrinit(mypath,1024); Wstrset(mypath,'/usrsp');
  Wstrcat(mypath,'/'); WstrCat(mypath,(sysinfo.userinfolist+sysindex-2)^.username);
- diskindex:=tydq_fs_systeminfo_disk_index(systemtable,edl);
+ diskindex:=tydq_fs_systeminfo_disk_index(edl);
  tydq_fs_create_file(systemtable,edl,diskindex,mypath,tydqfs_folder or tydqfs_system_file,userlevel_system,1);
  fsh:=tydq_fs_read_header(edl,diskindex); Wstrset(tydqcurrentdiskname,@fsh.RootName); Wstrset(tydqcurrentpath,mypath);
  freemem(mypath); freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
