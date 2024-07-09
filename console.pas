@@ -1889,7 +1889,7 @@ begin
     end
    else if(Wstrcmp((cpstr.partstrlist+1)^,'sysver')=0) and (WStrlen((cpstr.partstrlist+1)^)=6) then
     begin
-     efi_console_output_string(systemtable,'System Version:0.0.3'#10);
+     efi_console_output_string(systemtable,'System Version:0.0.4'#10);
     end
    else if(WStrcmp((cpstr.partstrlist+1)^,'sysname')=0) and (Wstrlen((cpstr.partstrlist+1)^)=7) then
     begin
@@ -1905,7 +1905,7 @@ begin
    else if(WStrcmp((cpstr.partstrlist+1)^,'sysinfo')=0) and (Wstrlen((cpstr.partstrlist+1)^)=7) then
     begin
      efi_console_output_string(systemtable,'System Name:TYDQ System'#10);
-     efi_console_output_string(systemtable,'System Version:0.0.3'#10);
+     efi_console_output_string(systemtable,'System Version:0.0.4'#10);
      procnum:=efi_get_platform;
      if(procnum=0) then efi_console_output_string(systemtable,'System Architecture:x64'#10)
      else if(procnum=1) then efi_console_output_string(systemtable,'System Architecture:aarch64'#10)
@@ -3940,7 +3940,7 @@ begin
     end
    else if(Wstrcmp(cpstr.partstrlist^,'sysver')=0) and (WStrlen(cpstr.partstrlist^)=6) then
     begin
-     efi_console_output_string(systemtable,'System Version:0.0.3'#10);
+     efi_console_output_string(systemtable,'System Version:0.0.4'#10);
     end
    else if(WStrcmp(cpstr.partstrlist^,'sysname')=0) and (Wstrlen(cpstr.partstrlist^)=7) then
     begin
@@ -3956,7 +3956,7 @@ begin
    else if(WStrcmp(cpstr.partstrlist^,'sysinfo')=0) and (Wstrlen(cpstr.partstrlist^)=7) then
     begin
      efi_console_output_string(systemtable,'System Name:TYDQ System'#10);
-     efi_console_output_string(systemtable,'System Version:0.0.3'#10);
+     efi_console_output_string(systemtable,'System Version:0.0.4'#10);
      procnum:=efi_get_platform;
      if(procnum=0) then efi_console_output_string(systemtable,'System Architecture:x64'#10)
      else if(procnum=1) then efi_console_output_string(systemtable,'System Architecture:aarch64'#10)

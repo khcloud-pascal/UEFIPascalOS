@@ -3890,7 +3890,6 @@ begin
    diop:=(disklist.disk_content+i-1)^;
    blocksize:=((disklist.disk_block_content+i-1)^)^.Media^.BlockSize;
    lastblock:=((disklist.disk_block_content+i-1)^)^.Media^.LastBlock;
-   efi_console_output_string(systemtable,'S1');
    diskwritepos:=0;
    for j:=1 to 440 do mbr.BootStrapCode[j]:=0;
    mbr.UniqueMbrSignature:=0; mbr.Unknown:=0;
@@ -3934,16 +3933,13 @@ begin
    gpt.AlternateLBA:=lastblock;
    gpt.FirstUsableLBA:=2+optimize_integer_divide(128,blocksize shr 7); 
    gpt.LastUsableLBA:=gpt.AlternateLBA-optimize_integer_divide(128,blocksize shr 7)-1;
-   efi_console_output_string(systemtable,'S2-1');
    gpt.DiskGuid:=efi_generate_guid($F1B2A2C3D7E3F967+32768*(i-1),$C1F2E3D1F4C9E84F+8192*(i-1));
    gpt.PartitionEntryLBA:=2;
    gpt.NumberOfPartitionEntries:=128;
    gpt.SizeOfPartitionEntry:=128;
    gpt.PartitionEntryArrayCRC32:=0;
    epe.epe_count:=128;
-   efi_console_output_string(systemtable,'S2-2');
    if(blocksize>92) then for j:=1 to blocksize-92 do gpt.reserved2[j]:=0;
-   efi_console_output_string(systemtable,'S2-3');
    if(i=harddiskindex) then
     begin
      for j:=1 to 128 do
@@ -4012,11 +4008,8 @@ begin
         end;
       end;
     end;
-   efi_console_output_string(systemtable,'S3');
    SystemTable^.BootServices^.CalculateCrc32(@epe.epe_content,sizeof(epe.epe_content),gpt.PartitionEntryArrayCRC32);
-   efi_console_output_string(systemtable,'S4');
    SystemTable^.BootServices^.CalculateCrc32(@gpt,gpt.headersize,gpt.headercrc32);
-   efi_console_output_string(systemtable,'S5');
    diop^.WriteDisk(diop,mediaid,0,sizeof(master_boot_record),@mbr);
    if(blocksize>512) then for j:=512 to blocksize-1 do diop^.WriteDisk(diop,mediaid,j,1,@zero);
    diskwritepos:=blocksize;
@@ -4025,7 +4018,6 @@ begin
    diskwritepos:=blocksize*2;
    diop^.WriteDisk(diop,mediaid,diskwritepos,sizeof(epe.epe_content),@epe.epe_content);
    diop^.WriteDisk(diop,mediaid,blocksize*lastblock-blocksize*optimize_integer_divide(128,blocksize shr 7),sizeof(epe.epe_content),@epe.epe_content);
-   efi_console_output_string(systemtable,'S6');
    if(i=harddiskindex) then
     begin
      fat32h.JumpOrder[1]:=$EB; fat32h.JumpOrder[2]:=$58; fat32h.JumpOrder[3]:=$90;
@@ -4077,7 +4069,6 @@ begin
      diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+blocksize*7,blocksize,@fat32fs);
      diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+1024*256*optimize_integer_divide(blocksize,blocksize shr 9),sizeof(efi_guid),@system_restart_guid);
     end;
-   efi_console_output_string(systemtable,'S7');
   end;
 end;
 procedure efi_install_cdrom_to_hard_disk_stage2(systemtable:Pefi_system_table;efslext:efi_file_system_list_ext;inscd,insdisk:natuint;const efipart:boolean);[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK_STAGE2'];
@@ -4142,8 +4133,7 @@ begin
    and (data.data4[7]=system_restart_guid.data4[7]) and (data.data4[8]=system_restart_guid.data4[8]) then
     begin
      Procdisk^.WriteDisk(procdisk,procblock^.Media^.MediaId,0,16,@unused_entry_guid);
-     mybool:=true; efi_console_output_string(systemtable,'C3');
-     break;
+     mybool:=true; break;
     end;
    inc(i,1);
   end;
