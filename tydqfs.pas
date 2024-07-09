@@ -18,20 +18,20 @@ type tydqfs_time=packed record
                  millisecond:word;
                  end;
      tydqfs_file=packed record
-                 fparentpos:qword;
+                 fparentpos:natuint;
                  fattribute:byte;
-                 fbelonguserindex:qword;
+                 fbelonguserindex:natuint;
                  fName:array[1..256] of WideChar;
                  fcreatetime:tydqfs_time;
                  flastedittime:tydqfs_time;
-                 fcontentCount:qword;
+                 fcontentCount:natuint;
                  end;
      tydqfs_header=packed record
-                   signature:qword;
-                   maxsize:qword;
-                   usedsize:qword;
+                   signature:natuint;
+                   maxsize:natuint;
+                   usedsize:natuint;
                    RootName:array[1..256] of WideChar;
-                   RootCount:qword;
+                   RootCount:natuint;
                    end;
      tydqfs_filename=array[1..256] of WideChar;
      tydqfs_file_list=record
@@ -68,43 +68,43 @@ type tydqfs_time=packed record
                         end;
      {Define executable files in TYDQ System}
      tydqfs_file_executable_relocation=packed record
-                                       relocation_number:qword;
-                                       relocation_offset:^qword;
+                                       relocation_number:natuint;
+                                       relocation_offset:^natuint;
                                        end;
      tydqfs_file_executable_string_table=packed record
-                                         string_table_size:qword;
+                                         string_table_size:natuint;
                                          string_table_content:^byte;
                                          end;
      tydqfs_file_executable_symbol_table=packed record
-                                         symbol_table_number:qword;
+                                         symbol_table_number:natuint;
                                          symbol_table_type:^byte;
-                                         symbol_table_address:^qword;
+                                         symbol_table_address:^natuint;
                                          end;
      tydqfs_file_executable_hash_table=packed record
-                                       hash_table_number:qword;
-                                       hash_table_address:^qword;
+                                       hash_table_number:natuint;
+                                       hash_table_address:^natuint;
                                        end;
      tydqfs_file_executable_section=packed record     
-                                    section_name_index:qword;
+                                    section_name_index:natuint;
                                     section_type:byte;
-                                    section_segment_size:qword;
+                                    section_segment_size:natuint;
                                     section_content:^Byte;
                                     end;
      tydqfs_file_executable=packed record
-                            exe_signature:qword;
+                            exe_signature:natuint;
                             exe_type:byte;
                             exe_arch:byte;
                             exe_version:array[1..4] of byte;
                             exe_relocation_offset:natuint;
                             exe_relocation_segment:tydqfs_file_executable_relocation;
-                            exe_string_table_offset:qword;
+                            exe_string_table_offset:natuint;
                             exe_string_table_segment:tydqfs_file_executable_string_table;
-                            exe_symbol_table_offset:qword;
+                            exe_symbol_table_offset:natuint;
                             exe_symbol_table_segment:tydqfs_file_executable_symbol_table;
-                            exe_hash_table_offset:qword;
+                            exe_hash_table_offset:natuint;
                             exe_hash_table_segment:tydqfs_file_executable_hash_table;
-                            exe_section_start_offset:qword;
-                            exe_section_number:qword;
+                            exe_section_start_offset:natuint;
+                            exe_section_number:natuint;
                             exe_section_segments:^tydqfs_file_executable_section;
                             end;
      tydqfs_file_executable_parameter=packed record
@@ -156,7 +156,7 @@ type tydqfs_time=packed record
                                  kernel_pecoff_optional_size_of_uninitialized_data:dword;
                                  kernel_pecoff_optional_address_of_entry_point:dword;
                                  kernel_pecoff_optional_base_of_code:dword;
-                                 kernel_pecoff_optional_image_base:qword;
+                                 kernel_pecoff_optional_image_base:natuint;
                                  kernel_pecoff_optional_section_alignment:dword;
                                  kernel_pecoff_optional_file_alignment:dword;
                                  kernel_pecoff_optional_major_operating_system_version:word;
@@ -171,16 +171,16 @@ type tydqfs_time=packed record
                                  kernel_pecoff_optional_check_sum:dword;
                                  kernel_pecoff_optional_subsystem:word;
                                  kernel_pecoff_optional_dll_characteristics:word;
-                                 kernel_pecoff_optional_size_of_stack_reserve:qword;
-                                 kernel_pecoff_optional_size_of_stack_commit:qword;
-                                 kernel_pecoff_optional_size_of_heap_reserve:qword;
-                                 kernel_pecoff_optional_size_of_heap_commit:qword;
+                                 kernel_pecoff_optional_size_of_stack_reserve:natuint;
+                                 kernel_pecoff_optional_size_of_stack_commit:natuint;
+                                 kernel_pecoff_optional_size_of_heap_reserve:natuint;
+                                 kernel_pecoff_optional_size_of_heap_commit:natuint;
                                  kernel_pecoff_optional_loader_flags:dword;
                                  kernel_pecoff_optional_number_of_rva_and_sizes:dword;
                                  kernel_pecoff_optional_data_directory:array[1..kernel_number_of_directory_entries] of tydqfs_kernel_data_directory;
                                  end;
     
-const tydqfs_signature:qword=$5D47291AD7E3F2B1;
+const tydqfs_signature:natuint=$5D47291AD7E3F2B1;
       tydqfs_folder:byte=$01;
       tydqfs_normal_file:byte=$02;
       tydqfs_system_file:byte=$04;
@@ -192,7 +192,7 @@ const tydqfs_signature:qword=$5D47291AD7E3F2B1;
       userlevel_system:byte=$00;
       userlevel_user:byte=$01;
       userlevel_application:byte=$02;
-      tydqfs_executable_signature:qword=$DD23F9E3F3C1ABEF;
+      tydqfs_executable_signature:natuint=$DD23F9E3F3C1ABEF;
       tydqfs_executable_executable:byte=$00;
       tydqfs_executable_relocatable:byte=$01;
       tydqfs_executable_object:byte=$02;
@@ -230,13 +230,13 @@ function tydq_fs_disk_name(edl:efi_disk_list;index:natuint):PWideChar;
 function tydq_fs_disk_is_formatted(edl:efi_disk_list;diskindex:natuint):boolean;
 function tydq_fs_file_exists(edl:efi_disk_list;diskindex:natuint;filename:PWideChar):boolean;
 function tydq_fs_file_position(edl:efi_disk_list;diskindex:natuint;filename:PWideChar):natuint;
-procedure tydq_fs_create_file(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;attr:byte;userlevel:byte;belonguserindex:qword);
-function tydq_fs_list_file(edl:efi_disk_list;diskindex:natuint;path:PWideChar;expanded:boolean;detecthidden:boolean;belonguserindex:qword):tydqfs_file_list;
-function tydq_fs_delete_file(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:qword):byte;
-function tydq_fs_file_read(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;position,readlength:natuint;userlevel:byte;belonguserindex:qword):tydqfs_data;
-function tydq_fs_file_info(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:qword):tydqfs_file;
-procedure tydq_fs_file_write(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;offset:natuint;writedata:Pointer;writesize:natuint;userlevel:byte;belonguserindex:qword);
-procedure tydq_fs_file_rewrite(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;writedata:Pointer;writesize:natuint;userlevel:byte;belonguserindex:qword);
+procedure tydq_fs_create_file(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;attr:byte;userlevel:byte;belonguserindex:natuint);
+function tydq_fs_list_file(edl:efi_disk_list;diskindex:natuint;path:PWideChar;expanded:boolean;detecthidden:boolean;belonguserindex:natuint):tydqfs_file_list;
+function tydq_fs_delete_file(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:natuint):byte;
+function tydq_fs_file_read(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;position,readlength:natuint;userlevel:byte;belonguserindex:natuint):tydqfs_data;
+function tydq_fs_file_info(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:natuint):tydqfs_file;
+procedure tydq_fs_file_write(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;offset:natuint;writedata:Pointer;writesize:natuint;userlevel:byte;belonguserindex:natuint);
+procedure tydq_fs_file_rewrite(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;writedata:Pointer;writesize:natuint;userlevel:byte;belonguserindex:natuint);
 function tydq_fs_systeminfo_init(lanindex:word):tydqfs_system_info;
 procedure tydq_fs_create_systeminfo_file(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint);
 function tydq_fs_systeminfo_read(systemtable:Pefi_system_table;edl:efi_disk_list):tydqfs_system_info;
@@ -249,8 +249,8 @@ function tydq_fs_systeminfo_get_index(sysinfo:tydqfs_system_info;username:PWideC
 function tydq_fs_systeminfo_get_manager_index(sysinfo:tydqfs_system_info):natuint;
 function tydq_fs_systeminfo_username_count(sysinfo:tydqfs_system_info;username:PWideChar):natuint;
 procedure tydq_fs_systeminfo_free(var sysinfo:tydqfs_system_info);
-function tydq_fs_read_executable(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:qword):tydqfs_file_executable;
-function tydq_fs_execute_executable(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;param:tydqfs_file_executable_parameter;userlevel:byte;belonguserindex:qword):boolean;
+function tydq_fs_read_executable(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:natuint):tydqfs_file_executable;
+function tydq_fs_execute_executable(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;param:tydqfs_file_executable_parameter;userlevel:byte;belonguserindex:natuint):boolean;
 procedure tydq_fs_free_executable(var fse:tydqfs_file_executable);
 function tydq_fs_detect_kernel(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:byte):boolean;
 function tydq_fs_change_kernel(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:byte):boolean;
@@ -442,7 +442,7 @@ begin
  tydqfsh.RootCount:=0;
  tydqdp^.WriteDisk(tydqdp,tydqbp^.Media^.MediaId,0,sizeof(tydqfs_header),@tydqfsh);
 end;
-function tydq_file_initialize(fattribute:byte;fparentpos:qword;filetime:efi_time;filename:PWideChar;fuserindex:byte):tydqfs_file;[public,alias:'TYDQ_FILE_INITIALIZE'];
+function tydq_file_initialize(fattribute:byte;fparentpos:natuint;filetime:efi_time;filename:PWideChar;fuserindex:byte):tydqfs_file;[public,alias:'TYDQ_FILE_INITIALIZE'];
 var tydqfile:tydqfs_file;
 begin
  tydqfile.fparentpos:=fparentpos;
@@ -677,7 +677,7 @@ begin
   end;
  tydq_fs_file_position:=res;
 end;
-procedure tydq_fs_create_file(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;attr:byte;userlevel:byte;belonguserindex:qword);[public,alias:'TYDQ_FS_CREATE_FILE'];
+procedure tydq_fs_create_file(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;attr:byte;userlevel:byte;belonguserindex:natuint);[public,alias:'TYDQ_FS_CREATE_FILE'];
 var dp:Pefi_disk_io_protocol;
     bp:Pefi_block_io_protocol;
     fsh:tydqfs_header;
@@ -851,7 +851,7 @@ begin
    tydq_fs_write_header(edl,diskindex,fsh);
   end;
 end;
-function tydq_fs_list_file(edl:efi_disk_list;diskindex:natuint;path:PWideChar;expanded:boolean;detecthidden:boolean;belonguserindex:qword):tydqfs_file_list;[public,alias:'TYDQ_FS_LIST_FILE'];
+function tydq_fs_list_file(edl:efi_disk_list;diskindex:natuint;path:PWideChar;expanded:boolean;detecthidden:boolean;belonguserindex:natuint):tydqfs_file_list;[public,alias:'TYDQ_FS_LIST_FILE'];
 var dp:Pefi_disk_io_protocol;
     bp:Pefi_block_io_protocol;
     fsh:tydqfs_header;
@@ -1010,7 +1010,7 @@ begin
   end;
  tydq_fs_list_file:=res;
 end;
-function tydq_fs_delete_file(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:qword):byte;[public,alias:'TYDQ_FS_DELETE_FILE'];
+function tydq_fs_delete_file(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:natuint):byte;[public,alias:'TYDQ_FS_DELETE_FILE'];
 var dp:Pefi_disk_io_protocol;
     bp:Pefi_block_io_protocol;
     fsl:tydqfs_file_list;
@@ -1132,7 +1132,7 @@ begin
  tydq_fs_write_header(edl,diskindex,fsh);
  tydq_fs_delete_file:=0;
 end;
-function tydq_fs_file_read(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;position,readlength:natuint;userlevel:byte;belonguserindex:qword):tydqfs_data;[public,alias:'TYDQ_FS_FILE_READ'];
+function tydq_fs_file_read(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;position,readlength:natuint;userlevel:byte;belonguserindex:natuint):tydqfs_data;[public,alias:'TYDQ_FS_FILE_READ'];
 var dp:Pefi_disk_io_protocol;
     bp:Pefi_block_io_protocol;
     i,fpos:natuint;
@@ -1159,7 +1159,7 @@ begin
   end;
  tydq_fs_file_read:=fsd;
 end;
-function tydq_fs_file_info(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:qword):tydqfs_file;[public,alias:'TYDQ_FS_FILE_INFO'];
+function tydq_fs_file_info(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:natuint):tydqfs_file;[public,alias:'TYDQ_FS_FILE_INFO'];
 var dp:Pefi_disk_io_protocol;
     bp:Pefi_block_io_protocol;
     fpos:natuint;
@@ -1180,7 +1180,7 @@ begin
   end;
  tydq_fs_file_info:=fsf;
 end;
-procedure tydq_fs_file_write(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;offset:natuint;writedata:Pointer;writesize:natuint;userlevel:byte;belonguserindex:qword);[public,alias:'TYDQ_FS_FILE_WRITE'];
+procedure tydq_fs_file_write(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;offset:natuint;writedata:Pointer;writesize:natuint;userlevel:byte;belonguserindex:natuint);[public,alias:'TYDQ_FS_FILE_WRITE'];
 var dp:Pefi_disk_io_protocol;
     bp:Pefi_block_io_protocol;
     i,j,fpos,dpos,rpos,len:natuint;
@@ -1257,7 +1257,7 @@ begin
  dp^.WriteDisk(dp,bp^.Media^.MediaId,fpos,sizeof(tydqfs_file),@fsf);
  tydq_fs_write_header(edl,diskindex,fsh);
 end;
-procedure tydq_fs_file_rewrite(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;writedata:Pointer;writesize:natuint;userlevel:byte;belonguserindex:qword);[public,alias:'TYDQ_FS_FILE_REWRITE'];
+procedure tydq_fs_file_rewrite(systemtable:Pefi_system_table;edl:efi_disk_list;diskindex:natuint;filename:PWideChar;writedata:Pointer;writesize:natuint;userlevel:byte;belonguserindex:natuint);[public,alias:'TYDQ_FS_FILE_REWRITE'];
 var dp:Pefi_disk_io_protocol;
     bp:Pefi_block_io_protocol;
     i,j,fpos,rpos:natuint;
@@ -1740,7 +1740,7 @@ begin
  freemem(sysinfo.userinfolist);
  sysinfo.header.tydqusercount:=0; sysinfo.header.tydqsyslang:=0; sysinfo.header.tydqnetwork:=false; sysinfo.header.tydqgraphics:=false;
 end;
-function tydq_fs_read_executable(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:qword):tydqfs_file_executable;[public,alias:'TYDQ_FS_READ_EXECUTABLE'];
+function tydq_fs_read_executable(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;userlevel:byte;belonguserindex:natuint):tydqfs_file_executable;[public,alias:'TYDQ_FS_READ_EXECUTABLE'];
 var position:natuint;
     fsf:tydqfs_file;
     dp:Pefi_disk_io_protocol;
@@ -1756,7 +1756,7 @@ begin
    exit(res);
   end;
  dp:=(edl.disk_content+diskindex-1)^; bp:=(edl.disk_block_content+diskindex-1)^;
- dp^.ReadDisk(dp,bp^.Media^.MediaId,position,sizeof(qword),res.exe_signature);
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position,sizeof(natuint),res.exe_signature);
  res.exe_version[1]:=0; res.exe_version[2]:=0; res.exe_version[3]:=0; res.exe_version[4]:=0;
  res.exe_relocation_offset:=0; res.exe_string_table_offset:=0; res.exe_symbol_table_offset:=0; 
  res.exe_hash_table_offset:=0; res.exe_section_start_offset:=0; res.exe_section_number:=0;
@@ -1771,74 +1771,74 @@ begin
    res.exe_signature:=0;
    exit(res);
   end;
- dp^.ReadDisk(dp,bp^.Media^.MediaId,position+sizeof(qword),sizeof(byte),res.exe_type);
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position+sizeof(natuint),sizeof(byte),res.exe_type);
  if(res.exe_type>$04) then 
   begin
    res.exe_signature:=0;
    exit(res);
   end;
- dp^.ReadDisk(dp,bp^.Media^.MediaId,position+sizeof(qword)+sizeof(byte),sizeof(byte),res.exe_arch);
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position+sizeof(natuint)+sizeof(byte),sizeof(byte),res.exe_arch);
  if(res.exe_type>$05) then 
   begin
    res.exe_signature:=0;
    exit(res);
   end;
- dp^.ReadDisk(dp,bp^.Media^.MediaId,position+sizeof(qword)+sizeof(byte)*2,sizeof(byte)*4,res.exe_version);
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position+sizeof(natuint)+sizeof(byte)*2,sizeof(byte)*4,res.exe_version);
  {Load the relocation segment}
- offset:=sizeof(qword)+sizeof(byte)*2+sizeof(byte)*4;
- dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(qword),res.exe_relocation_offset);
+ offset:=sizeof(natuint)+sizeof(byte)*2+sizeof(byte)*4;
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(natuint),res.exe_relocation_offset);
  dp^.ReadDisk(dp,bp^.Media^.MediaId,position+res.exe_relocation_offset,
  sizeof(tydqfs_file_executable_relocation)-sizeof(natuint),res.exe_relocation_segment);
- res.exe_relocation_segment.relocation_offset:=exe_heap_allocmem(res.exe_relocation_segment.relocation_number*sizeof(qword));
+ res.exe_relocation_segment.relocation_offset:=exe_heap_allocmem(res.exe_relocation_segment.relocation_number*sizeof(natuint));
  for i:=1 to res.exe_relocation_segment.relocation_number do
   begin
-   dp^.ReadDisk(dp,bp^.Media^.MediaId,res.exe_relocation_offset+sizeof(qword)+sizeof(qword)*(i-1),sizeof(qword),
+   dp^.ReadDisk(dp,bp^.Media^.MediaId,res.exe_relocation_offset+sizeof(natuint)+sizeof(natuint)*(i-1),sizeof(natuint),
    (res.exe_relocation_segment.relocation_offset+i-1)^);
   end;
  {Load the string table segment}
- offset:=sizeof(qword)+sizeof(byte)*2+sizeof(byte)*4+sizeof(qword);
- dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(qword),res.exe_string_table_offset);
+ offset:=sizeof(natuint)+sizeof(byte)*2+sizeof(byte)*4+sizeof(natuint);
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(natuint),res.exe_string_table_offset);
  dp^.ReadDisk(dp,bp^.Media^.MediaId,position+res.exe_string_table_offset,
  sizeof(tydqfs_file_executable_string_table)-sizeof(natuint),res.exe_string_table_segment);
  res.exe_string_table_segment.string_table_content:=exe_heap_allocmem(res.exe_string_table_segment.string_table_size);
  for i:=1 to res.exe_string_table_segment.string_table_size do
   begin
-   dp^.ReadDisk(dp,bp^.Media^.MediaId,res.exe_string_table_offset+sizeof(qword)+sizeof(byte)*(i-1),sizeof(byte),
+   dp^.ReadDisk(dp,bp^.Media^.MediaId,res.exe_string_table_offset+sizeof(natuint)+sizeof(byte)*(i-1),sizeof(byte),
    (res.exe_string_table_segment.string_table_content+i-1)^);
   end;
  {Load the symbol table segment}
- offset:=sizeof(qword)+sizeof(byte)*2+sizeof(byte)*4+sizeof(qword)*2;
- dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(qword),res.exe_symbol_table_offset);
+ offset:=sizeof(natuint)+sizeof(byte)*2+sizeof(byte)*4+sizeof(natuint)*2;
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(natuint),res.exe_symbol_table_offset);
  dp^.ReadDisk(dp,bp^.Media^.MediaId,position+res.exe_symbol_table_offset,
  sizeof(tydqfs_file_executable_symbol_table)-sizeof(natuint)-sizeof(natuint),res.exe_symbol_table_segment);
  res.exe_symbol_table_segment.symbol_table_type:=exe_heap_allocmem(res.exe_symbol_table_segment.symbol_table_number*sizeof(byte));
  for i:=1 to res.exe_symbol_table_segment.symbol_table_number do
   begin
-   dp^.ReadDisk(dp,bp^.Media^.MediaId,res.exe_symbol_table_offset+sizeof(qword)+sizeof(byte)*(i-1),sizeof(byte),
+   dp^.ReadDisk(dp,bp^.Media^.MediaId,res.exe_symbol_table_offset+sizeof(natuint)+sizeof(byte)*(i-1),sizeof(byte),
    (res.exe_symbol_table_segment.symbol_table_type+i-1)^);
   end;
- res.exe_symbol_table_segment.symbol_table_address:=exe_heap_allocmem(res.exe_symbol_table_segment.symbol_table_number*sizeof(qword));
+ res.exe_symbol_table_segment.symbol_table_address:=exe_heap_allocmem(res.exe_symbol_table_segment.symbol_table_number*sizeof(natuint));
  for i:=1 to res.exe_symbol_table_segment.symbol_table_number do
   begin
-   dp^.ReadDisk(dp,bp^.Media^.MediaId,res.exe_symbol_table_offset+sizeof(qword)+sizeof(qword)*(i-1),sizeof(qword),
+   dp^.ReadDisk(dp,bp^.Media^.MediaId,res.exe_symbol_table_offset+sizeof(natuint)+sizeof(natuint)*(i-1),sizeof(natuint),
    (res.exe_symbol_table_segment.symbol_table_address+i-1)^);
   end;
  {Load the hash table segment}
- offset:=sizeof(qword)+sizeof(byte)*2+sizeof(byte)*4+sizeof(qword)*3;
- dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(qword),res.exe_hash_table_offset);
+ offset:=sizeof(natuint)+sizeof(byte)*2+sizeof(byte)*4+sizeof(natuint)*3;
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(natuint),res.exe_hash_table_offset);
  dp^.ReadDisk(dp,bp^.Media^.MediaId,position+res.exe_symbol_table_offset,
  sizeof(tydqfs_file_executable_hash_table)-sizeof(natuint),res.exe_hash_table_segment);
- res.exe_hash_table_segment.hash_table_address:=exe_heap_allocmem(res.exe_hash_table_segment.hash_table_number*sizeof(qword));
+ res.exe_hash_table_segment.hash_table_address:=exe_heap_allocmem(res.exe_hash_table_segment.hash_table_number*sizeof(natuint));
  for i:=1 to res.exe_hash_table_segment.hash_table_number do
   begin
-   dp^.ReadDisk(dp,bp^.Media^.MediaId,res.exe_hash_table_offset+sizeof(qword)+sizeof(qword)*(i-1),sizeof(qword),
+   dp^.ReadDisk(dp,bp^.Media^.MediaId,res.exe_hash_table_offset+sizeof(natuint)+sizeof(natuint)*(i-1),sizeof(natuint),
    (res.exe_hash_table_segment.hash_table_address+i-1)^);
   end;
  {Load the section}
- offset:=sizeof(qword)+sizeof(byte)*2+sizeof(byte)*4+sizeof(qword)*4;
- dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(qword),res.exe_section_start_offset);
- offset:=sizeof(qword)+sizeof(byte)*2+sizeof(byte)*4+sizeof(qword)*5;
- dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(qword),res.exe_section_number);
+ offset:=sizeof(natuint)+sizeof(byte)*2+sizeof(byte)*4+sizeof(natuint)*4;
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(natuint),res.exe_section_start_offset);
+ offset:=sizeof(natuint)+sizeof(byte)*2+sizeof(byte)*4+sizeof(natuint)*5;
+ dp^.ReadDisk(dp,bp^.Media^.MediaId,position+offset,sizeof(natuint),res.exe_section_number);
  res.exe_section_segments:=exe_heap_allocmem(sizeof(tydqfs_file_executable_section)*res.exe_section_number);
  offset:=0; 
  for i:=1 to res.exe_section_number do
@@ -1854,7 +1854,7 @@ begin
     end;
   end;
 end;
-function tydq_fs_execute_executable(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;param:tydqfs_file_executable_parameter;userlevel:byte;belonguserindex:qword):boolean;[public,alias:'TYDQ_FS_EXECUTE_EXECUTABLE'];
+function tydq_fs_execute_executable(edl:efi_disk_list;diskindex:natuint;filename:PWideChar;param:tydqfs_file_executable_parameter;userlevel:byte;belonguserindex:natuint):boolean;[public,alias:'TYDQ_FS_EXECUTE_EXECUTABLE'];
 var dp:Pefi_disk_io_protocol;
     bp:Pefi_block_io_protocol;
     exefile:tydqfs_file_executable;

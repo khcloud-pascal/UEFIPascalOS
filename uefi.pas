@@ -2695,7 +2695,7 @@ function efi_generate_fat32_volumeid(seed1:dword):dword;
 function efi_list_all_file_system(SystemTable:Pefi_system_table;isreadonly:byte):efi_file_system_list;
 function efi_list_all_file_system_ext(SystemTable:Pefi_system_table):efi_file_system_list_ext;
 function efi_detect_disk_write_ability(SystemTable:Pefi_system_table):efi_disk_list;
-procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;filesystemlist:efi_file_system_list;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);
+procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);
 procedure efi_install_cdrom_to_hard_disk_stage2(systemtable:Pefi_system_table;efslext:efi_file_system_list_ext;inscd,insdisk:natuint;const efipart:boolean);
 procedure efi_system_restart_information_off(systemtable:Pefi_system_table;var mybool:boolean);
 function efi_disk_empty_list(systemTable:Pefi_system_table):efi_disk_list;
@@ -3736,10 +3736,10 @@ var resguid:efi_guid;
     mseed2,mseed3:word;
     mseed4:array[1..8] of byte;
 begin
- mseed1:=seed1 div 4294967296;
- mseed2:=seed1 mod 4294967296 div 65536;
+ mseed1:=seed1 shr 32;
+ mseed2:=seed1 mod 4294967296 shr 16;
  mseed3:=seed1 mod 4294967296 mod 65536;
- for i:=1 to 8 do mseed4[i]:=optimize_integer_modulo(optimize_integer_divide(seed2,UintPower(2,(8-i)*8)),UintPower(2,(i-1)*8));
+ for i:=1 to 8 do mseed4[i]:=optimize_integer_modulo(optimize_integer_divide(seed2,2 shl ((8-i)*8)),2 shl ((i-1)*8));
  resguid.data1:=mseed1 div 13*5+12;
  resguid.data2:=mseed2 div 7*3+17;
  resguid.data3:=mseed3 div 3*2+21;
@@ -3762,7 +3762,7 @@ var totalnum,i:natuint;
     realsize:natuint;
 begin
  SystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_simple_file_system_protocol_guid,nil,totalnum,totalbuf);
- data.file_system_content:=allocmem(sizeof(Pointer)*1024); data.file_system_count:=0;
+ data.file_system_content:=allocmem(totalnum*sizeof(Pointer)); data.file_system_count:=0;
  for i:=1 to totalnum do
   begin
    SystemTable^.BootServices^.HandleProtocol((totalbuf+i-1)^,@efi_simple_file_system_protocol_guid,sfspp);
@@ -3785,6 +3785,7 @@ begin
      (data.file_system_content+data.file_system_count-1)^:=Pefi_simple_file_system_protocol(sfspp);
     end;
   end;
+ ReallocMem(data.file_system_content,sizeof(Pefi_simple_file_system_protocol)*data.file_system_count);
  efi_list_all_file_system:=data;
 end;
 function efi_list_all_file_system_ext(SystemTable:Pefi_system_table):efi_file_system_list_ext;[public,alias:'EFI_LIST_ALL_FILE_SYSTEM_EXT'];
@@ -3798,8 +3799,8 @@ var totalnum,i,j:natuint;
     realsize:natuint;
 begin
  SystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_simple_file_system_protocol_guid,nil,totalnum,totalbuf);
- data.fsrcontent:=allocmem(sizeof(Pointer)*1024); data.fsrcount:=0;
- data.fsrwcontent:=allocmem(sizeof(Pointer)*1024); data.fsrwcount:=0;
+ data.fsrcontent:=allocmem(sizeof(Pointer)*totalnum); data.fsrcount:=0;
+ data.fsrwcontent:=allocmem(sizeof(Pointer)*totalnum); data.fsrwcount:=0;
  for i:=1 to totalnum do
   begin
    SystemTable^.BootServices^.HandleProtocol((totalbuf+i-1)^,@efi_simple_file_system_protocol_guid,sfspp);
@@ -3833,45 +3834,49 @@ end;
 function efi_detect_disk_write_ability(SystemTable:Pefi_system_table):efi_disk_list;[public,alias:'EFI_DETECT_DISK_WRITE_ABILITY'];
 var tnum1,tnum2,i:natuint;
     tbuf1,tbuf2:Pefi_handle;
-    p1,p2:Pointer;
+    p1:Pefi_disk_io_protocol;
+    p2:Pefi_block_io_protocol;
     mydata1,mydata2:natuint;
     reslist:efi_disk_list;
     status:efi_status;
+    size:natuint;
 begin
  SystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_disk_io_protocol_guid,nil,tnum1,tbuf1);
  SystemTable^.BootServices^.LocateHandleBuffer(ByProtocol,@efi_block_io_protocol_guid,nil,tnum2,tbuf2);
- reslist.disk_content:=allocmem(1024*sizeof(Pointer)); 
- reslist.disk_block_content:=allocmem(1024*sizeof(Pointer)); 
+ reslist.disk_content:=allocmem(tnum1*sizeof(Pefi_disk_io_protocol)); 
+ reslist.disk_block_content:=allocmem(tnum2*sizeof(Pefi_block_io_protocol)); 
  reslist.disk_count:=0;
  for i:=1 to tnum1 do
   begin
    SystemTable^.BootServices^.HandleProtocol((tbuf1+i-1)^,@efi_disk_io_protocol_guid,p1);
    SystemTable^.BootServices^.HandleProtocol((tbuf2+i-1)^,@efi_block_io_protocol_guid,p2);
    mydata1:=$5D47291AD7E3F2B1;
-   Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,sizeof(natuint),mydata2);
-   status:=Pefi_disk_io_protocol(p1)^.WriteDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,sizeof(natuint),@mydata1);
+   p1^.ReadDisk(p1,p2^.Media^.MediaId,0,sizeof(natuint),mydata2);
+   status:=p1^.WriteDisk(p1,p2^.Media^.MediaId,0,sizeof(natuint),@mydata1);
    if(status=efi_success) then
     begin
-     Pefi_disk_io_protocol(p1)^.WriteDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,sizeof(natuint),@mydata2);
-     Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,0,sizeof(master_boot_record),rmbr);
-     Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,
-     Pefi_block_io_protocol(p2)^.Media^.BlockSize,Pefi_block_io_protocol(p2)^.Media^.BlockSize,rgpt1);
-     Pefi_disk_io_protocol(p1)^.ReadDisk(Pefi_disk_io_protocol(p1),Pefi_block_io_protocol(p2)^.Media^.MediaId,
-     Pefi_block_io_protocol(p2)^.Media^.BlockSize*Pefi_block_io_protocol(p2)^.Media^.LastBlock,
-     Pefi_block_io_protocol(p2)^.Media^.BlockSize,rgpt2);
+     p1^.WriteDisk(p1,p2^.Media^.MediaId,0,sizeof(natuint),@mydata2);
+     p1^.ReadDisk(p1,p2^.Media^.MediaId,0,sizeof(master_boot_record),rmbr);
+     p1^.ReadDisk(p1,p2^.Media^.MediaId,p2^.Media^.BlockSize,p2^.Media^.BlockSize,rgpt1);
+     p1^.ReadDisk(p1,p2^.Media^.MediaId,p2^.Media^.BlockSize*p2^.Media^.LastBlock,p2^.Media^.BlockSize,rgpt2);
      if(rmbr.Partition[1].OStype=$EE) and ((rgpt1.signature=$5452415020494645) or (rgpt2.signature=$5452415020494645)) then continue;
      inc(reslist.disk_count);
-     (reslist.disk_content+reslist.disk_count-1)^:=Pefi_disk_io_protocol(p1);
-     (reslist.disk_block_content+reslist.disk_count-1)^:=Pefi_block_io_protocol(p2);
+     (reslist.disk_content+reslist.disk_count-1)^:=p1;
+     (reslist.disk_block_content+reslist.disk_count-1)^:=p2;
     end;
   end;
+ size:=getmemsize(reslist.disk_content);
+ ReallocMem(reslist.disk_content,sizeof(Pointer)*reslist.disk_count);
+ reslist.disk_block_content:=Pointer(Pointer(reslist.disk_block_content)-size);
+ size:=getmemsize(reslist.disk_block_content);
+ ReallocMem(reslist.disk_block_content,sizeof(Pointer)*reslist.disk_count);
+ reslist.disk_content:=Pointer(Pointer(reslist.disk_content)-size);
  efi_detect_disk_write_ability:=reslist;
 end;
-procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;filesystemlist:efi_file_system_list;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK'];
+procedure efi_install_cdrom_to_hard_disk(systemtable:Pefi_system_table;disklist:efi_disk_list;cdromindex,harddiskindex:natuint);[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK'];
 var i,j,lastblock,blocksize,mediaid,diskwritepos,FirstDataSector:natuint;
     tmpv1,tmpv2,tmpv3:natuint;
     zero:byte;
-    sfsp:Pefi_simple_file_system_protocol;
     fp:Pefi_file_protocol;
     efsi:efi_file_system_info;
     readsize:natuint;
@@ -3879,12 +3884,13 @@ var i,j,lastblock,blocksize,mediaid,diskwritepos,FirstDataSector:natuint;
     status:efi_status;
     fssignature:qword;
 begin
- sfsp:=(filesystemlist.file_system_content+cdromindex-1)^; zero:=0;
+ zero:=0;
  for i:=1 to disklist.disk_count do
   begin
    diop:=(disklist.disk_content+i-1)^;
    blocksize:=((disklist.disk_block_content+i-1)^)^.Media^.BlockSize;
    lastblock:=((disklist.disk_block_content+i-1)^)^.Media^.LastBlock;
+   efi_console_output_string(systemtable,'S1');
    diskwritepos:=0;
    for j:=1 to 440 do mbr.BootStrapCode[j]:=0;
    mbr.UniqueMbrSignature:=0; mbr.Unknown:=0;
@@ -3917,6 +3923,7 @@ begin
        mbr.Partition[j].SizeInLBA:=$00000000;
       end;
     end;
+   efi_console_output_string(systemtable,'S2');
    mbr.signature:=$AA55;
    gpt.signature:=$5452415020494645;
    gpt.revision:=$00010000;
@@ -3925,15 +3932,18 @@ begin
    gpt.reserved1:=0;
    gpt.MyLBA:=1; 
    gpt.AlternateLBA:=lastblock;
-   gpt.FirstUsableLBA:=2+optimize_integer_divide(128,blocksize div 128); 
-   gpt.LastUsableLBA:=gpt.AlternateLBA-optimize_integer_divide(128,blocksize div 128)-1;
-   gpt.DiskGuid:=efi_generate_guid($F1B2A2C3D7E3F967+32768*i,$C1F2E3D1F4C9E84F+8192*i);
+   gpt.FirstUsableLBA:=2+optimize_integer_divide(128,blocksize shr 7); 
+   gpt.LastUsableLBA:=gpt.AlternateLBA-optimize_integer_divide(128,blocksize shr 7)-1;
+   efi_console_output_string(systemtable,'S2-1');
+   gpt.DiskGuid:=efi_generate_guid($F1B2A2C3D7E3F967+32768*(i-1),$C1F2E3D1F4C9E84F+8192*(i-1));
    gpt.PartitionEntryLBA:=2;
    gpt.NumberOfPartitionEntries:=128;
    gpt.SizeOfPartitionEntry:=128;
    gpt.PartitionEntryArrayCRC32:=0;
    epe.epe_count:=128;
+   efi_console_output_string(systemtable,'S2-2');
    if(blocksize>92) then for j:=1 to blocksize-92 do gpt.reserved2[j]:=0;
+   efi_console_output_string(systemtable,'S2-3');
    if(i=harddiskindex) then
     begin
      for j:=1 to 128 do
@@ -3943,7 +3953,7 @@ begin
          epe.epe_content[j].PartitionTypeGUID:=efi_system_partition_guid;
          epe.epe_content[j].UniquePartitionGUID:=efi_generate_guid($F1B2A2C3D7E3F967+4096*i+j*21,$C1F2E3D1F4C9E84F+3072*i+j*17);
          epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA;
-         epe.epe_content[j].EndingLBA:=gpt.FirstUsableLBA+256*optimize_integer_divide(1024,blocksize div 512)-1;
+         epe.epe_content[j].EndingLBA:=gpt.FirstUsableLBA+256*optimize_integer_divide(1024,blocksize shr 9)-1;
          epe.epe_content[j].Attributes:=0;
          epe.epe_content[j].PartitionName[1]:='E';
          epe.epe_content[j].PartitionName[2]:='F';
@@ -3954,7 +3964,7 @@ begin
         begin
          epe.epe_content[j].PartitionTypeGUID:=efi_generate_guid($F1B2A2C3D7E3F967+4096*i+j*23,$C1F2E3D1F4C9E84F+4096*i+j*19);
          epe.epe_content[j].UniquePartitionGUID:=efi_generate_guid($F1B2A2C3D7E3F967+4096*i+j*21,$C1F2E3D1F4C9E84F+4096*i+j*17);
-         epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA+256*optimize_integer_divide(1024,blocksize div 512);
+         epe.epe_content[j].StartingLBA:=gpt.FirstUsableLBA+256*optimize_integer_divide(1024,blocksize shr 9);
          epe.epe_content[j].EndingLBA:=gpt.LastUsableLBA;
          epe.epe_content[j].Attributes:=0;
          epe.epe_content[j].PartitionName[1]:='T';
@@ -4002,8 +4012,11 @@ begin
         end;
       end;
     end;
+   efi_console_output_string(systemtable,'S3');
    SystemTable^.BootServices^.CalculateCrc32(@epe.epe_content,sizeof(epe.epe_content),gpt.PartitionEntryArrayCRC32);
+   efi_console_output_string(systemtable,'S4');
    SystemTable^.BootServices^.CalculateCrc32(@gpt,gpt.headersize,gpt.headercrc32);
+   efi_console_output_string(systemtable,'S5');
    diop^.WriteDisk(diop,mediaid,0,sizeof(master_boot_record),@mbr);
    if(blocksize>512) then for j:=512 to blocksize-1 do diop^.WriteDisk(diop,mediaid,j,1,@zero);
    diskwritepos:=blocksize;
@@ -4012,6 +4025,7 @@ begin
    diskwritepos:=blocksize*2;
    diop^.WriteDisk(diop,mediaid,diskwritepos,sizeof(epe.epe_content),@epe.epe_content);
    diop^.WriteDisk(diop,mediaid,blocksize*lastblock-blocksize*optimize_integer_divide(128,blocksize shr 7),sizeof(epe.epe_content),@epe.epe_content);
+   efi_console_output_string(systemtable,'S6');
    if(i=harddiskindex) then
     begin
      fat32h.JumpOrder[1]:=$EB; fat32h.JumpOrder[2]:=$58; fat32h.JumpOrder[3]:=$90;
@@ -4063,6 +4077,7 @@ begin
      diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+blocksize*7,blocksize,@fat32fs);
      diop^.WriteDisk(diop,mediaid,gpt.FirstUsableLBA*blocksize+1024*256*optimize_integer_divide(blocksize,blocksize shr 9),sizeof(efi_guid),@system_restart_guid);
     end;
+   efi_console_output_string(systemtable,'S7');
   end;
 end;
 procedure efi_install_cdrom_to_hard_disk_stage2(systemtable:Pefi_system_table;efslext:efi_file_system_list_ext;inscd,insdisk:natuint;const efipart:boolean);[public,alias:'EFI_INSTALL_CDROM_TO_HARD_DISK_STAGE2'];
@@ -4115,10 +4130,11 @@ var edl:efi_disk_list;
     i:natuint;
 begin
  edl:=efi_detect_disk_write_ability(systemtable); mybool:=false;
- for i:=1 to edl.disk_count do
+ i:=1;
+ while(i<=edl.disk_count) do
   begin
-   procdisk:=(edl.disk_content+i-1)^; procblock:=(edl.disk_block_content+i-1)^;
-   Procdisk^.ReadDisk(procdisk,procblock^.Media^.MediaId,0,16,data);
+   procdisk:=(edl.disk_content+i-1)^; procblock:=(edl.disk_block_content+i-1)^; 
+   procdisk^.ReadDisk(procdisk,procblock^.Media^.MediaId,0,16,data);
    if(data.data1=system_restart_guid.data1) and  (data.data2=system_restart_guid.data2) and (data.data3=system_restart_guid.data3) 
    and (data.data4[1]=system_restart_guid.data4[1]) and (data.data4[2]=system_restart_guid.data4[2])
    and (data.data4[3]=system_restart_guid.data4[3]) and (data.data4[4]=system_restart_guid.data4[4])
@@ -4126,9 +4142,13 @@ begin
    and (data.data4[7]=system_restart_guid.data4[7]) and (data.data4[8]=system_restart_guid.data4[8]) then
     begin
      Procdisk^.WriteDisk(procdisk,procblock^.Media^.MediaId,0,16,@unused_entry_guid);
-     mybool:=true; break;
+     mybool:=true; efi_console_output_string(systemtable,'C3');
+     break;
     end;
+   inc(i,1);
   end;
+ if(i>edl.disk_count) then mybool:=false;
+ freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
 end;
 function efi_disk_empty_list(systemTable:Pefi_system_table):efi_disk_list;[public,alias:'EFI_DISK_EMPTY_LIST'];
 var edl,redl:efi_disk_list;
@@ -4139,8 +4159,8 @@ var edl,redl:efi_disk_list;
 begin
  edl:=efi_detect_disk_write_ability(systemtable); 
  redl.disk_count:=0;
- redl.disk_content:=allocmem(sizeof(Pointer)*1024); 
- redl.disk_block_content:=allocmem(sizeof(Pointer)*1024);
+ redl.disk_content:=allocmem(sizeof(Pointer)*edl.disk_count); 
+ redl.disk_block_content:=allocmem(sizeof(Pointer)*edl.disk_count);
  for i:=1 to edl.disk_count do
   begin
    procdisk:=(edl.disk_content+i-1)^; procblock:=(edl.disk_block_content+i-1)^;

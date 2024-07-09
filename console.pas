@@ -4,7 +4,7 @@ interface
 
 {$MODE FPC}
 
-uses tydqfs,uefi;
+uses tydqfs,uefi,shell;
 
 type cmdpartstr=record
                 partstrnum:natuint;
@@ -15,7 +15,6 @@ type cmdpartstr=record
                    shelllinecount:natuint;
                    end;  
 procedure console_main(systemtable:Pefi_system_table;var sysinfo:tydqfs_system_info;var sysindex:natuint);
-procedure console_shell_parser(systemtable:Pefi_system_table;var sysinfo:tydqfs_system_info;var sysindex:natuint;shellstr:PWideChar);
 procedure console_command_parser(systemtable:Pefi_system_table;var sysinfo:tydqfs_system_info;var sysindex:natuint;cmdstr:PWideChar);
 procedure console_initialize(systemtable:Pefi_system_table;sysinfo:tydqfs_system_info;sysindex:natuint);
 
@@ -66,36 +65,6 @@ begin
    freemem(cmdstr); freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
   end;
 end;
-procedure console_shell_parser(systemtable:Pefi_system_table;var sysinfo:tydqfs_system_info;var sysindex:natuint;shellstr:PWideChar);[public,alias:'console_shell_parser'];
-var cmdline:cmdshellline;
-    partstr:PWideChar;
-    i,i1,i2,l,len:natuint;
-    pptr:natuint;
-begin
- i1:=1; i2:=2; i:=0; len:=Wstrlen(shellstr);
- cmdline.shelllinecount:=Wstrcount(shellstr,#10,1)+1;
- cmdline.shellline:=allocmem(sizeof(natuint)*cmdline.shelllinecount);
- while(i<cmdline.shelllinecount) do
-  begin
-   inc(i);
-   i2:=Wstrpos(shellstr,#10,i1+1);
-   if((shellstr+i1)^=' ') then inc(i1);
-   if(i2>0) then
-   (cmdline.shellline+i-1)^:=Wstrcutout(shellstr,i1+1,i2-1)
-   else
-   (cmdline.shellline+i-1)^:=Wstrcutout(shellstr,i1+1,len);
-   i1:=i2;
-  end;
- pptr:=1;
- while(pptr<=cmdline.shelllinecount) do
-  begin
-   Wstrinit(partstr,32768);
-   Wstrset(partstr,(cmdline.shellline+pptr-1)^);
-   console_command_parser(systemtable,sysinfo,sysindex,partstr);
-   Wstrfree(partstr);
-   inc(pptr);
-  end;
-end; 
 procedure console_command_parser(systemtable:Pefi_system_table;var sysinfo:tydqfs_system_info;var sysindex:natuint;cmdstr:PWideChar);[public,alias:'console_command_parser'];
 var cpstr:cmdpartstr;
     procnum,procnum2,procnum3,procnum4,procnum5,procnum6:natuint;
@@ -1260,6 +1229,28 @@ begin
        efi_console_output_string(systemtable,'Vaild commands can be searched in help manual.'#10);
       end;
     end
+   else if(WStrCmpL((cpstr.partstrlist+1)^,'shell')=0) then
+    begin
+     if(cpstr.partstrnum<3) then 
+      begin
+       efi_console_output_string(systemtable,'shell must have at least one path!'#10);
+       for i:=cpstr.partstrnum downto 1 do
+        begin
+         Wstrfree((cpstr.partstrlist+i-1)^);
+        end;
+       freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+       exit;
+      end;
+     edl:=efi_disk_tydq_get_fs_list(systemtable);
+     for i:=3 to cpstr.partstrnum do
+      begin
+       partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+i-1)^);
+       procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+i-1)^);
+       shell_execute_code(systemtable,edl,procnum,partstr5,userlevel_system,sysinfo,sysindex);
+       Wstrfree(partstr5);
+      end;
+     freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
+    end
    else if(WstrcmpL((cpstr.partstrlist+1)^,'readexe')=0) then
     begin
      if(cpstr.partstrnum<3) then 
@@ -2148,6 +2139,17 @@ begin
          efi_console_output_string(systemtable,'openlink resetlink'#10);
         end;
       end
+     else if(WStrCmpL((cpstr.partstrlist+2)^,'shell')=0) then
+      begin
+       efi_console_output_string(systemtable,'Execute the shell code file'#39's information'#10);
+       efi_console_output_string(systemtable,'Usage:shell <path1..n>(n>=1)'#10);
+       efi_console_output_string(systemtable,'shell code tips:'#10);
+       efi_console_output_string(systemtable,'if(statement){expression}'#10'variable-name =/+=/-=/*=//=/%= variable-value'#10);
+       efi_console_output_string(systemtable,'for(variable-name = initial value:final value){expression}'#10);
+       efi_console_output_string(systemtable,'while(statement){expression}'#10);
+       efi_console_output_string(systemtable,'do{expression}while(statement)'#10);
+       efi_console_output_string(systemtable,'switch(variable){case 0:{expression}break;...}'#10);
+      end
      else if(WStrCmpL((cpstr.partstrlist+2)^,'readexe')=0) then
       begin
        efi_console_output_string(systemtable,'Read the executable file'#39's information'#10);
@@ -2253,7 +2255,7 @@ begin
        efi_console_output_string(systemtable,(cpstr.partstrlist+2)^);
        efi_console_output_string(systemtable,' unrecognized,'#10);
        efi_console_output_string(systemtable,'So please type vaild command to show help manual!'#10);
-       efi_console_output_string(systemtable,'Vaild commands:sp reboot shutdown echo delay file readexe execute passwd usrname path'#10);
+       efi_console_output_string(systemtable,'Vaild commands:sp reboot shutdown echo delay file shell readexe execute passwd usrname path'#10);
        efi_console_output_string(systemtable,'addusr delusr lsuser lsdisk kerneldetect kernelinstall logout help sysver sysname sysarch sysinfo sysctl'#10);
       end;
     end
@@ -3445,6 +3447,28 @@ begin
        efi_console_output_string(systemtable,'Vaild commands can be searched in help manual.'#10);
       end;
     end
+   else if(WStrCmpL((cpstr.partstrlist+1)^,'shell')=0) then
+    begin
+     if(cpstr.partstrnum<2) then 
+      begin
+       efi_console_output_string(systemtable,'shell must have at least one path!'#10);
+       for i:=cpstr.partstrnum downto 1 do
+        begin
+         Wstrfree((cpstr.partstrlist+i-1)^);
+        end;
+       freemem(cpstr.partstrlist); cpstr.partstrnum:=0;
+       exit;
+      end;
+     edl:=efi_disk_tydq_get_fs_list(systemtable);
+     for i:=2 to cpstr.partstrnum do
+      begin
+       partstr5:=tydq_fs_locate_fullpath(edl,(cpstr.partstrlist+i-1)^);
+       procnum:=tydq_fs_locate_diskindex(edl,(cpstr.partstrlist+i-1)^);
+       shell_execute_code(systemtable,edl,procnum,partstr5,userlevel_system,sysinfo,sysindex);
+       Wstrfree(partstr5);
+      end;
+     freemem(edl.disk_block_content); freemem(edl.disk_content); edl.disk_count:=0;
+    end
    else if(WstrcmpL(cpstr.partstrlist^,'readexe')=0) then
     begin
      if(cpstr.partstrnum<2) then 
@@ -4081,6 +4105,17 @@ begin
          efi_console_output_string(systemtable,'openlink resetlink'#10);
         end;
       end
+     else if(WStrCmpL((cpstr.partstrlist+1)^,'shell')=0) then
+      begin
+       efi_console_output_string(systemtable,'Execute the shell code file'#39's information'#10);
+       efi_console_output_string(systemtable,'Usage:shell <path1..n>(n>=1)'#10);
+       efi_console_output_string(systemtable,'shell code tips:'#10);
+       efi_console_output_string(systemtable,'if(statement){expression}'#10'variable-name =/+=/-=/*=//=/%= variable-value'#10);
+       efi_console_output_string(systemtable,'for(variable-name = initial value:final value){expression}'#10);
+       efi_console_output_string(systemtable,'while(statement){expression}'#10);
+       efi_console_output_string(systemtable,'do{expression}while(statement)'#10);
+       efi_console_output_string(systemtable,'switch(variable){case 0:{expression}break;...}'#10);
+      end
      else if(WStrCmpL((cpstr.partstrlist+1)^,'readexe')=0) then
       begin
        efi_console_output_string(systemtable,'Read the executable file'#39's information'#10);
@@ -4186,7 +4221,7 @@ begin
        efi_console_output_string(systemtable,(cpstr.partstrlist+1)^);
        efi_console_output_string(systemtable,' unrecognized,'#10);
        efi_console_output_string(systemtable,'So please type vaild command to show help manual!'#10);
-       efi_console_output_string(systemtable,'Vaild commands:sp reboot shutdown echo delay file readexe execute passwd usrname path'#10);
+       efi_console_output_string(systemtable,'Vaild commands:sp reboot shutdown echo delay file shell readexe execute passwd usrname path'#10);
        efi_console_output_string(systemtable,'addusr delusr lsuser lsdisk kerneldetect kernelinstall logout help sysver sysname sysarch sysinfo sysctl'#10);
       end;
     end

@@ -27,14 +27,20 @@ var mystr,mystr2,mystr3,mystr4,writestr,partstr:PWideChar;
     size:natuint;
     {Ended autodetectkernel}
 begin
+ {Initialize the system heap and executable heap}
+ compheap.heapcount:=0; compheap.heaprest:=maxheap;
+ sysheap.heapcount:=0; sysheap.heaprest:=maxheap;
+ exe_heap.heap_count:=0; exe_heap.heap_rest_volume:=exe_heap_content_max_volume*sizeof(word);
+ {Initiailize ended}
  ParentImageHandle:=ImageHandle; GlobalSystemTable:=SystemTable;
  efi_console_set_global_colour(Systemtable,efi_bck_black,efi_lightgrey);
  efi_console_clear_screen(systemtable);
- efi_console_get_max_row_and_max_column(systemtable,true);
+ efi_console_get_max_row_and_max_column(systemtable,false);
  efi_console_enable_mouse(systemtable);
  efi_console_enable_mouse_blink(systemtable,true,500);
  efi_set_watchdog_timer_to_null(systemtable);
  efi_console_output_string(systemtable,'Welcome to TYDQ System!'#10);
+ sysheap.heaprest:=maxheap; sysheap.heapcount:=0;
  eedl:=efi_disk_empty_list(systemtable); 
  edl:=efi_disk_tydq_get_fs_list(systemtable);
  if(eedl.disk_count>0) and (edl.disk_count=0) then

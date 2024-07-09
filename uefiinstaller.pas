@@ -19,6 +19,10 @@ var mystr,mystr2,mystr3,partstr:PWideChar;
     mybool,havesysinfo:boolean;
     fsi:tydqfs_system_info;
 begin
+ {Initialize the system heap and executable heap}
+ compheap.heapcount:=0; compheap.heaprest:=maxheap;
+ sysheap.heapcount:=0; sysheap.heaprest:=maxheap;
+ {Initiailize ended}
  efi_console_set_global_colour(Systemtable,efi_bck_black,efi_lightgrey);
  efi_console_clear_screen(systemtable);
  efi_console_get_max_row_and_max_column(systemtable,false);
@@ -26,7 +30,8 @@ begin
  efi_console_enable_mouse_blink(systemtable,true,500);
  efi_set_watchdog_timer_to_null(systemtable);
  efslext:=efi_list_all_file_system_ext(systemtable);
- efi_system_restart_information_off(systemtable,mybool); havesysinfo:=false;
+ efi_system_restart_information_off(systemtable,mybool); 
+ havesysinfo:=false; 
  if(efslext.fsrwcount=0) and (mybool=false) then
  begin
   efsl:=efi_list_all_file_system(systemtable,1);
@@ -95,7 +100,7 @@ begin
   if(efsl.file_system_count>1) then
    begin
     cdindex:=efsl.file_system_count+1;
-    while (cdindex=0) or (cdindex<efsl.file_system_count+1) do
+    while (cdindex=0) or (cdindex>=efsl.file_system_count+1) do
      begin
       efi_console_output_string(systemtable,'Select the cdrom to install:');
       efi_console_read_string(systemtable,mystr);
@@ -107,7 +112,7 @@ begin
   if(edl.disk_count>1) then
    begin
     hdindex:=edl.disk_count+1;
-    while (hdindex=0) or (hdindex<edl.disk_count+1) do
+    while (hdindex=0) or (hdindex>=edl.disk_count+1) do
      begin
       efi_console_output_string(systemtable,'Select the hard disk to be installed:');
       efi_console_read_string(systemtable,mystr);
@@ -116,7 +121,7 @@ begin
       if(hdindex>=edl.disk_count+1) or (hdindex=0) then efi_console_output_string(systemtable,'Error:Invaild Hard Disk.'+#13#10);
      end;
    end;
-  efi_install_cdrom_to_hard_disk(systemtable,efsl,edl,cdindex,hdindex);
+  efi_install_cdrom_to_hard_disk(systemtable,edl,cdindex,hdindex);
   efi_console_output_string(systemtable,'Stage 1 Install done!Now you can reboot the installer to enter stage 2!'+#13#10);
   SystemTable^.RuntimeServices^.ResetSystem(EfiResetWarm,efi_success,0,nil);
  end
